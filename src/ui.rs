@@ -169,7 +169,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
 
     frame.render_widget(commands_widget, commands);
 
-    let quit_and_close_widget = Paragraph::new(Line::from(vec!["'q' / ".red(), "Ctrl + C".red()]))
+    let quit_and_close_widget = Paragraph::new(Line::from(vec!["Ctrl + C".red(), "'q' / ".red()]))
         .block(
             Block::default()
                 .borders(Borders::ALL)
