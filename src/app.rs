@@ -191,13 +191,16 @@ impl App {
                         return {};
                     }
                     let (selected, node_to_append_to) = found_node.unwrap();
+
+                    let gcloud_configuration_dir = dirs::home_dir()
+                        .unwrap()
+                        .join(".config/gcloud/configurations");
+
                     match selected.as_str() {
                         "Azure Data Lake Storage" => {}
                         "Google Cloud Storage" => {
-                            let configs = cli_command(
-                                "ls",
-                                vec!["/Users/6148139/.config/gcloud/configurations"],
-                            );
+                            let configs =
+                                cli_command("ls", vec![gcloud_configuration_dir.to_str().unwrap()]);
                             // let (selected, node_to_append_to) =
                             //     find_node_to_append(self.connection_tree.clone(), path);
 
