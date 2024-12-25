@@ -1,6 +1,6 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation};
 use ratatui::Frame;
 use std::time::Instant;
@@ -27,7 +27,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
     let viewer = content_chunks[1];
 
     // connections
-    let connections_widget = Tree::new(&app.connection_items)
+    let connections_widget = Tree::new(&app.connections.items)
         .expect("all item identifieers are unique")
         .block(Block::bordered().title("Cloud Connections"))
         .experimental_scrollbar(Some(
@@ -40,7 +40,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
     frame.render_stateful_widget(
         connections_widget.clone(),
         connections,
-        &mut app.connection_state,
+        &mut app.connections.state,
     );
 
     if let CurrentScreen::Connections = app.current_screen {
@@ -61,14 +61,14 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
         frame.render_stateful_widget(
             highlight_connections,
             connections,
-            &mut app.connection_state,
+            &mut app.connections.state,
         );
     }
 
     ////////////////////////////////////////
 
     // viewer
-    let viewer_widget = Tree::new(&app.viewer_items)
+    let viewer_widget = Tree::new(&app.viewer.items)
         .expect("all item identifiers are unique")
         .block(
             Block::bordered().title("Cloud Storage Viewer"), // .title_bottom(format!("{:?}", app.state)),
@@ -80,7 +80,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
                 .end_symbol(None),
         ));
 
-    frame.render_stateful_widget(viewer_widget.clone(), viewer, &mut app.viewer_state);
+    frame.render_stateful_widget(viewer_widget.clone(), viewer, &mut app.viewer.state);
 
     if let CurrentScreen::Viewer = app.current_screen {
         let highlight_viewer = viewer_widget
@@ -97,7 +97,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
             )
             .highlight_symbol(">> ");
 
-        frame.render_stateful_widget(highlight_viewer, viewer, &mut app.viewer_state);
+        frame.render_stateful_widget(highlight_viewer, viewer, &mut app.viewer.state);
     }
     ///////////////////////////////////////
 
@@ -120,7 +120,8 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
     let quit_and_close = footer_chunks[2];
 
     let active_connection_widget = Paragraph::new(Line::from(vec![app
-        .active_connection
+        .connections
+        .active
         .clone()
         .unwrap()
         .green()]))

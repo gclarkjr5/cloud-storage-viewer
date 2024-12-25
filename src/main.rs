@@ -8,6 +8,9 @@ use ratatui::layout::Position;
 use ratatui::{crossterm, Terminal};
 
 mod app;
+mod cli;
+mod components;
+mod config;
 mod ui;
 
 use crate::app::App;
@@ -72,30 +75,30 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             KeyCode::End | KeyCode::Char('j')
                                 if key.modifiers.contains(KeyModifiers::CONTROL) =>
                             {
-                                app.viewer_state.select_last()
+                                app.viewer.state.select_last()
                             }
                             KeyCode::Home | KeyCode::Char('k')
                                 if key.modifiers.contains(KeyModifiers::CONTROL) =>
                             {
-                                app.viewer_state.select_first()
+                                app.viewer.state.select_first()
                             }
-                            KeyCode::Down | KeyCode::Char('j') => app.viewer_state.key_down(),
-                            KeyCode::Up | KeyCode::Char('k') => app.viewer_state.key_up(),
-                            KeyCode::Left | KeyCode::Char('h') => app.viewer_state.key_left(),
-                            KeyCode::Right | KeyCode::Char('l') => app.viewer_state.key_right(),
-                            KeyCode::Char('\n' | ' ') => app.viewer_state.toggle_selected(),
-                            KeyCode::Esc => app.viewer_state.select(Vec::new()),
-                            KeyCode::PageDown => app.viewer_state.scroll_down(3),
-                            KeyCode::PageUp => app.viewer_state.scroll_up(3),
+                            KeyCode::Down | KeyCode::Char('j') => app.viewer.state.key_down(),
+                            KeyCode::Up | KeyCode::Char('k') => app.viewer.state.key_up(),
+                            KeyCode::Left | KeyCode::Char('h') => app.viewer.state.key_left(),
+                            KeyCode::Right | KeyCode::Char('l') => app.viewer.state.key_right(),
+                            KeyCode::Char('\n' | ' ') => app.viewer.state.toggle_selected(),
+                            KeyCode::Esc => app.viewer.state.select(Vec::new()),
+                            KeyCode::PageDown => app.viewer.state.scroll_down(3),
+                            KeyCode::PageUp => app.viewer.state.scroll_up(3),
                             KeyCode::Enter => {
                                 // app.add_items(Some(app.state.viewer.selected().to_vec()));
-                                app.list_items(Some(app.viewer_state.selected().to_vec()));
-                                let selected = app.viewer_state.selected().to_vec();
-                                app.viewer_state.open(selected)
+                                app.list_items(Some(app.viewer.state.selected().to_vec()));
+                                let selected = app.viewer.state.selected().to_vec();
+                                app.viewer.state.open(selected)
                             }
                             KeyCode::Char('L') => {
                                 app.increase_results_page();
-                                app.list_items(Some(app.viewer_state.selected().to_vec()))
+                                app.list_items(Some(app.viewer.state.selected().to_vec()))
                             }
                             KeyCode::Tab => {
                                 app.toggle_screen();
@@ -112,33 +115,35 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             KeyCode::End | KeyCode::Char('j')
                                 if key.modifiers.contains(KeyModifiers::CONTROL) =>
                             {
-                                app.connection_state.select_last()
+                                app.connections.state.select_last()
                             }
                             KeyCode::Home | KeyCode::Char('k')
                                 if key.modifiers.contains(KeyModifiers::CONTROL) =>
                             {
-                                app.connection_state.select_first()
+                                app.connections.state.select_first()
                             }
-                            KeyCode::Down | KeyCode::Char('j') => app.connection_state.key_down(),
-                            KeyCode::Up | KeyCode::Char('k') => app.connection_state.key_up(),
-                            KeyCode::Left | KeyCode::Char('h') => app.connection_state.key_left(),
-                            KeyCode::Right | KeyCode::Char('l') => app.connection_state.key_right(),
-                            KeyCode::Char('\n' | ' ') => app.connection_state.toggle_selected(),
-                            KeyCode::Esc => app.connection_state.select(Vec::new()),
-                            KeyCode::PageDown => app.connection_state.scroll_down(3),
-                            KeyCode::PageUp => app.connection_state.scroll_up(3),
+                            KeyCode::Down | KeyCode::Char('j') => app.connections.state.key_down(),
+                            KeyCode::Up | KeyCode::Char('k') => app.connections.state.key_up(),
+                            KeyCode::Left | KeyCode::Char('h') => app.connections.state.key_left(),
+                            KeyCode::Right | KeyCode::Char('l') => {
+                                app.connections.state.key_right()
+                            }
+                            KeyCode::Char('\n' | ' ') => app.connections.state.toggle_selected(),
+                            KeyCode::Esc => app.connections.state.select(Vec::new()),
+                            KeyCode::PageDown => app.connections.state.scroll_down(3),
+                            KeyCode::PageUp => app.connections.state.scroll_up(3),
                             KeyCode::Enter => {
-                                // app.add_items(Some(app.connection_state.selected().to_vec()));
-                                app.list_items(Some(app.connection_state.selected().to_vec()));
-                                let selected = app.connection_state.selected().to_vec();
-                                app.connection_state.open(selected)
+                                // app.add_items(Some(app.connections.state.selected().to_vec()));
+                                app.list_items(Some(app.connections.state.selected().to_vec()));
+                                let selected = app.connections.state.selected().to_vec();
+                                app.connections.state.open(selected)
                             }
                             KeyCode::Tab => {
                                 app.toggle_screen();
                                 true
                             }
                             KeyCode::Char('a') => app.activate_connection(Some(
-                                app.connection_state.selected().to_vec(),
+                                app.connections.state.selected().to_vec(),
                             )),
 
                             _ => false,
@@ -147,18 +152,20 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                 },
                 Event::Mouse(mouse) => match app.current_screen {
                     CurrentScreen::Connections => match mouse.kind {
-                        MouseEventKind::ScrollDown => app.connection_state.scroll_down(1),
-                        MouseEventKind::ScrollUp => app.connection_state.scroll_up(1),
+                        MouseEventKind::ScrollDown => app.connections.state.scroll_down(1),
+                        MouseEventKind::ScrollUp => app.connections.state.scroll_up(1),
                         MouseEventKind::Down(_button) => app
-                            .connection_state
+                            .connections
+                            .state
                             .click_at(Position::new(mouse.column, mouse.row)),
                         _ => false,
                     },
                     CurrentScreen::Viewer => match mouse.kind {
-                        MouseEventKind::ScrollDown => app.viewer_state.scroll_down(1),
-                        MouseEventKind::ScrollUp => app.viewer_state.scroll_up(1),
+                        MouseEventKind::ScrollDown => app.viewer.state.scroll_down(1),
+                        MouseEventKind::ScrollUp => app.viewer.state.scroll_up(1),
                         MouseEventKind::Down(_button) => app
-                            .viewer_state
+                            .viewer
+                            .state
                             .click_at(Position::new(mouse.column, mouse.row)),
                         _ => false,
                     },
