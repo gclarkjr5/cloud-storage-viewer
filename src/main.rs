@@ -93,6 +93,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                                 let selected = app.viewer_state.selected().to_vec();
                                 app.viewer_state.open(selected)
                             }
+                            KeyCode::Char('L') => {
+                                app.increase_results_page();
+                                app.list_items(Some(app.viewer_state.selected().to_vec()))
+                            }
                             KeyCode::Tab => {
                                 app.toggle_screen();
                                 true
