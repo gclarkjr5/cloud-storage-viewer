@@ -6,7 +6,7 @@ use ratatui::Frame;
 use std::time::Instant;
 use tui_tree_widget::Tree;
 
-use crate::app::CurrentScreen;
+use crate::app::Focus;
 use crate::App;
 
 pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
@@ -43,7 +43,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
         &mut app.connections.state,
     );
 
-    if let CurrentScreen::Connections = app.current_screen {
+    if let Focus::Connections = app.focus {
         let highlight_connections = connections_widget
             .block(
                 Block::bordered()
@@ -82,7 +82,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
 
     frame.render_stateful_widget(viewer_widget.clone(), viewer, &mut app.viewer.state);
 
-    if let CurrentScreen::Viewer = app.current_screen {
+    if let Focus::Viewer = app.focus {
         let highlight_viewer = viewer_widget
             .block(
                 Block::bordered()
@@ -134,8 +134,8 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
 
     frame.render_widget(active_connection_widget, active_connection);
 
-    let commands_widget = match app.current_screen {
-        CurrentScreen::Connections => {
+    let commands_widget = match app.focus {
+        Focus::Connections => {
             let connection_commands = vec![
                 "Switch to Viewer=".into(),
                 "[Tab] ".blue(),
@@ -151,7 +151,7 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
                     .style(Style::default()),
             )
         }
-        CurrentScreen::Viewer => {
+        Focus::Viewer => {
             let viewer_commands = vec![
                 "Viewer Commands: ".into(),
                 "Switch to Connections=".into(),
@@ -186,16 +186,16 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
     // .block(Block::default().borders(Borders::ALL));
 
     // let current_keys_hint = {
-    //     match app.current_screen {
-    //         CurrentScreen::Main => Span::styled(
+    //     match app.focus {
+    //         Focus::Main => Span::styled(
     //             "(q) to quit / (e) to make new pair",
     //             Style::default().fg(Color::Red),
     //         ),
-    //         CurrentScreen::Editing => Span::styled(
+    //         Focus::Editing => Span::styled(
     //             "(ESC) to cancel/(Tab) to switch boxes/enter to complete",
     //             Style::default().fg(Color::Red),
     //         ),
-    //         CurrentScreen::Exiting => Span::styled(
+    //         Focus::Exiting => Span::styled(
     //             "(q) to quit / (e) to make new pair",
     //             Style::default().fg(Color::Red),
     //         ),

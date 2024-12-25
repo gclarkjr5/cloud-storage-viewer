@@ -24,14 +24,14 @@ impl fmt::Display for Cloud {
 }
 
 #[derive(Debug)]
-pub enum CurrentScreen {
+pub enum Focus {
     Connections,
     Viewer,
 }
 
 #[must_use]
 pub struct App {
-    pub current_screen: CurrentScreen,
+    pub focus: Focus,
     // pub cloud: Cloud,
     pub connections: Connections,
     pub viewer: Viewer,
@@ -40,7 +40,7 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         Self {
-            current_screen: CurrentScreen::Connections,
+            focus: Focus::Connections,
             // cloud: Cloud::Gcs,
             viewer: Viewer::new(),
             connections: Connections::new(),
@@ -48,9 +48,9 @@ impl App {
     }
 
     pub fn toggle_screen(&mut self) {
-        match self.current_screen {
-            CurrentScreen::Connections => self.current_screen = CurrentScreen::Viewer,
-            CurrentScreen::Viewer => self.current_screen = CurrentScreen::Connections,
+        match self.focus {
+            Focus::Connections => self.focus = Focus::Viewer,
+            Focus::Viewer => self.focus = Focus::Connections,
         }
     }
 
@@ -98,8 +98,8 @@ impl App {
                 unimplemented!()
             }
 
-            Some(path) => match self.current_screen {
-                CurrentScreen::Connections => {
+            Some(path) => match self.focus {
+                Focus::Connections => {
                     // find available configs
                     // find the connection node to append the configs to
                     // append the configs
@@ -171,11 +171,11 @@ impl App {
                             });
                             self.viewer.items =
                                 make_items(self.viewer.tree.clone(), self.viewer.results_page_idx);
-                            self.current_screen = CurrentScreen::Viewer
+                            self.focus = Focus::Viewer
                         }
                     }
                 }
-                CurrentScreen::Viewer => {
+                Focus::Viewer => {
                     let found_node = find_node_to_append(self.viewer.tree.clone(), path.clone());
                     if found_node.is_none() {
                         return false;

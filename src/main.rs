@@ -1,7 +1,8 @@
 use std::time::{Duration, Instant};
 
-use app::CurrentScreen;
+use app::Focus;
 use crossterm::event::KeyEventKind;
+use logging::initialize_logging;
 use ratatui::backend::{Backend, CrosstermBackend};
 use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers, MouseEventKind};
 use ratatui::layout::Position;
@@ -11,12 +12,14 @@ mod app;
 mod cli;
 mod components;
 mod config;
+mod logging;
 mod ui;
 
 use crate::app::App;
 use crate::ui::ui;
 
 fn main() -> std::io::Result<()> {
+    initialize_logging().expect("error initializing logging");
     // Terminal initialization
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = std::io::stdout();
@@ -58,15 +61,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
     loop {
         let timeout = debounce.map_or(DEBOUNCE, |start| DEBOUNCE.saturating_sub(start.elapsed()));
         if crossterm::event::poll(timeout)? {
-            // if let Event::Key(key) = crossterm::event::read()? {
-
             let update = match crossterm::event::read()? {
                 Event::Key(key) => match key.kind {
                     KeyEventKind::Release => {
                         continue;
                     }
-                    _ => match app.current_screen {
-                        CurrentScreen::Viewer => match key.code {
+                    _ => match app.focus {
+                        Focus::Viewer => match key.code {
                             KeyCode::Char('q') | KeyCode::Char('c')
                                 if key.modifiers.contains(KeyModifiers::CONTROL) =>
                             {
@@ -106,7 +107,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             }
                             _ => false,
                         },
-                        CurrentScreen::Connections => match key.code {
+                        Focus::Connections => match key.code {
                             KeyCode::Char('q') | KeyCode::Char('c')
                                 if key.modifiers.contains(KeyModifiers::CONTROL) =>
                             {
@@ -150,8 +151,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                         },
                     },
                 },
-                Event::Mouse(mouse) => match app.current_screen {
-                    CurrentScreen::Connections => match mouse.kind {
+                Event::Mouse(mouse) => match app.focus {
+                    Focus::Connections => match mouse.kind {
                         MouseEventKind::ScrollDown => app.connections.state.scroll_down(1),
                         MouseEventKind::ScrollUp => app.connections.state.scroll_up(1),
                         MouseEventKind::Down(_button) => app
@@ -160,7 +161,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             .click_at(Position::new(mouse.column, mouse.row)),
                         _ => false,
                     },
-                    CurrentScreen::Viewer => match mouse.kind {
+                    Focus::Viewer => match mouse.kind {
                         MouseEventKind::ScrollDown => app.viewer.state.scroll_down(1),
                         MouseEventKind::ScrollUp => app.viewer.state.scroll_up(1),
                         MouseEventKind::Down(_button) => app
