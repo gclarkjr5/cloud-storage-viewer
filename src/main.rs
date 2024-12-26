@@ -94,14 +94,20 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             KeyCode::PageUp => app.viewer.state.scroll_up(3),
                             KeyCode::Enter => {
                                 // app.add_items(Some(app.state.viewer.selected().to_vec()));
-                                app.list_items(Some(app.viewer.state.selected().to_vec()));
+                                app.list_items(
+                                    Some(app.viewer.state.selected().to_vec()),
+                                    app.viewer.results_pager.page_idx,
+                                );
                                 let selected = app.viewer.state.selected().to_vec();
                                 app.viewer.state.open(selected)
                             }
                             KeyCode::Char('L') => {
                                 app.increase_results_page();
-                                app.viewer.state.select_last();
-                                app.list_items(Some(app.viewer.state.selected().to_vec()))
+                                app.list_items(
+                                    Some(app.viewer.state.selected().to_vec()),
+                                    app.viewer.results_pager.page_idx,
+                                );
+                                app.viewer.state.select_last()
                             }
                             KeyCode::Tab => {
                                 app.toggle_screen();
@@ -137,7 +143,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             KeyCode::PageUp => app.connections.state.scroll_up(3),
                             KeyCode::Enter => {
                                 // app.add_items(Some(app.connections.state.selected().to_vec()));
-                                app.list_items(Some(app.connections.state.selected().to_vec()));
+                                app.list_items(Some(app.connections.state.selected().to_vec()), 0);
                                 let selected = app.connections.state.selected().to_vec();
                                 app.connections.state.open(selected)
                             }
