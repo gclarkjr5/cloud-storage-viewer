@@ -224,4 +224,25 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
             area,
         );
     }
+    {
+        // let text = format()" placing possible pagination stuff here".to_string();
+        let text = format!(
+            "currently paging: {}\npage: {} of Some\ntotal results: {}",
+            app.viewer.results_pager.paged_item,
+            app.viewer.results_page_idx,
+            app.viewer.results_pager.total_results,
+        );
+
+        #[allow(clippy::cast_possible_truncation)]
+        let area = Rect {
+            y: content.height - 2,
+            height: 1,
+            x: frame.area().width.saturating_sub(text.len() as u16),
+            width: text.len() as u16,
+        };
+        frame.render_widget(
+            Span::styled(text, Style::new().fg(Color::Black).bg(Color::Gray)),
+            area,
+        );
+    }
 }

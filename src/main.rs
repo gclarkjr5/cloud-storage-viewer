@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use app::Focus;
+use components::connections::Connections;
 use crossterm::event::KeyEventKind;
 use logging::initialize_logging;
 use ratatui::backend::{Backend, CrosstermBackend};
@@ -99,6 +100,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             }
                             KeyCode::Char('L') => {
                                 app.increase_results_page();
+                                app.viewer.state.select_last();
                                 app.list_items(Some(app.viewer.state.selected().to_vec()))
                             }
                             KeyCode::Tab => {
