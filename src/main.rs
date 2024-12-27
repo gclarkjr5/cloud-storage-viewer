@@ -102,13 +102,21 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                                 app.viewer.state.open(selected)
                             }
                             KeyCode::Char('L') => {
-                                app.increase_results_page();
-                                app.list_items(
-                                    Some(app.viewer.state.selected().to_vec()),
-                                    app.viewer.results_pager.page_idx,
-                                );
-                                app.viewer.state.select_last()
+                                if app.increase_results_page().is_some() {
+                                    app.list_items(
+                                        Some(app.viewer.state.selected().to_vec()),
+                                        app.viewer.results_pager.page_idx,
+                                    );
+                                    app.viewer.state.select_last()
+                                } else {
+                                    false
+                                }
                             }
+                            // KeyCode::Char('r') => {
+                            //     app.viewer
+                            //         .refresh_items(app.viewer.state.selected().to_vec());
+                            //     app.viewer.state.select_last()
+                            // }
                             KeyCode::Tab => {
                                 app.toggle_screen();
                                 true

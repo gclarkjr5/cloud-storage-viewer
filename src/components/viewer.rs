@@ -3,6 +3,7 @@ use std::{io::BufRead, process::Command};
 use ego_tree::{NodeId, NodeRef, Tree};
 use tui_tree_widget::{TreeItem, TreeState};
 
+#[derive(Debug, Clone)]
 pub struct ResultsPager {
     pub results_per_page: usize,
     pub page_idx: usize,
@@ -70,6 +71,17 @@ impl Viewer {
         }
     }
 
+    pub fn refresh_items(&mut self, path: Vec<String>) {
+        let (_, found_node) = self.find_node_to_append(path.clone()).unwrap();
+
+        // HOW DO WE REMOVE CHILDREN FROM A NODE
+        // self.tree
+        //     .get_mut(node_id)
+        //     .expect("error getting mutable node")
+        //     .detach();
+        self.items = self.make_items(self.tree.clone(), self.results_pager.page_idx);
+    }
+
     pub fn make_items(
         &mut self,
         tree: Tree<String>,
@@ -93,11 +105,12 @@ impl Viewer {
     }
 
     pub fn list_items(&mut self, path: Vec<String>, page_idx: usize) -> Option<()> {
-        let found_node = self.find_node_to_append(self.tree.clone(), path.clone());
+        let found_node = self.find_node_to_append(path.clone());
 
         found_node.as_ref()?;
 
         let (view_selection, node_to_append_to) = found_node.unwrap();
+        self.results_pager.paged_item = view_selection.clone();
         let is_directory = view_selection
             .chars()
             .last()
@@ -124,7 +137,6 @@ impl Viewer {
 
     pub fn find_node_to_append(
         &mut self,
-        tree: Tree<String>,
         path_identifier: Vec<String>,
     ) -> Option<(String, NodeId)> {
         let selected = path_identifier
@@ -133,8 +145,7 @@ impl Viewer {
             .expect("error getting selected item")
             .as_str();
 
-        let found_node = tree.nodes().find(|node| node.value() == selected);
-        // .expect("error finding node");
+        let found_node = self.tree.nodes().find(|node| node.value() == selected);
 
         found_node.as_ref()?;
 

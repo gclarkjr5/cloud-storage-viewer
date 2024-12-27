@@ -78,8 +78,13 @@ impl App {
         true
     }
 
-    pub fn increase_results_page(&mut self) {
-        self.viewer.results_pager.page_idx += 1;
+    pub fn increase_results_page(&mut self) -> Option<()> {
+        if self.viewer.results_pager.page_idx + 1 < self.viewer.results_pager.num_pages {
+            self.viewer.results_pager.page_idx += 1;
+            Some(())
+        } else {
+            None
+        }
     }
 
     pub fn list_items(&mut self, path_identifier: Option<Vec<String>>, page_idx: usize) -> bool {
@@ -94,10 +99,8 @@ impl App {
                         None => false,
                         Some(_) => {
                             // listings from configs will be buckets, which should append to the root node in the viewer
-                            let found_node = self.viewer.find_node_to_append(
-                                self.viewer.tree.clone(),
-                                vec!["CloudFS".to_string()],
-                            );
+                            let found_node =
+                                self.viewer.find_node_to_append(vec!["CloudFS".to_string()]);
                             if found_node.is_none() {
                                 return false;
                             }

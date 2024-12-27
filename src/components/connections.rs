@@ -113,7 +113,13 @@ impl Connections {
             }
             "AWS S3" => None,
             "Connections" => None,
-            _ => Some(()),
+            _ => {
+                if selected != self.active.clone().unwrap() {
+                    None
+                } else {
+                    Some(())
+                }
+            }
         }
     }
 }
