@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use app::Focus;
-use components::connections::Connections;
+use components::viewer::Viewer;
 use crossterm::event::KeyEventKind;
 use logging::initialize_logging;
 use ratatui::backend::{Backend, CrosstermBackend};
@@ -84,6 +84,29 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             {
                                 app.viewer.state.select_first()
                             }
+                            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                // if the page index does increase
+                                if app.viewer.increase_results_page().is_some() {
+                                    app.list_items(
+                                        Some(vec![app.viewer.results_pager.paged_item.clone()]),
+                                        "previous_page",
+                                    );
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                if app.viewer.decrease_results_page().is_some() {
+                                    app.list_items(
+                                        Some(vec![app.viewer.results_pager.paged_item.clone()]),
+                                        "previous_page",
+                                    );
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                             KeyCode::Down | KeyCode::Char('j') => app.viewer.state.key_down(),
                             KeyCode::Up | KeyCode::Char('k') => app.viewer.state.key_up(),
                             KeyCode::Left | KeyCode::Char('h') => app.viewer.state.key_left(),
@@ -96,27 +119,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                                 // app.add_items(Some(app.state.viewer.selected().to_vec()));
                                 app.list_items(
                                     Some(app.viewer.state.selected().to_vec()),
-                                    app.viewer.results_pager.page_idx,
+                                    "request",
                                 );
                                 let selected = app.viewer.state.selected().to_vec();
                                 app.viewer.state.open(selected)
                             }
-                            KeyCode::Char('L') => {
-                                if app.increase_results_page().is_some() {
-                                    app.list_items(
-                                        Some(app.viewer.state.selected().to_vec()),
-                                        app.viewer.results_pager.page_idx,
-                                    );
-                                    app.viewer.state.select_last()
-                                } else {
-                                    false
-                                }
-                            }
-                            // KeyCode::Char('r') => {
-                            //     app.viewer
-                            //         .refresh_items(app.viewer.state.selected().to_vec());
-                            //     app.viewer.state.select_last()
-                            // }
                             KeyCode::Tab => {
                                 app.toggle_screen();
                                 true
@@ -150,8 +157,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                             KeyCode::PageDown => app.connections.state.scroll_down(3),
                             KeyCode::PageUp => app.connections.state.scroll_up(3),
                             KeyCode::Enter => {
-                                // app.add_items(Some(app.connections.state.selected().to_vec()));
-                                app.list_items(Some(app.connections.state.selected().to_vec()), 0);
+                                app.list_items(
+                                    Some(app.connections.state.selected().to_vec()),
+                                    "request",
+                                );
                                 let selected = app.connections.state.selected().to_vec();
                                 app.connections.state.open(selected)
                             }
@@ -159,9 +168,14 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> std::io::Res
                                 app.toggle_screen();
                                 true
                             }
-                            KeyCode::Char('a') => app.activate_connection(Some(
-                                app.connections.state.selected().to_vec(),
-                            )),
+                            KeyCode::Char('a') => {
+                                app.connections.activate_connection(Some(
+                                    app.connections.state.selected().to_vec(),
+                                ));
+                                app.viewer =
+                                    Viewer::new(app.connections.active.clone().unwrap().as_str());
+                                true
+                            }
 
                             _ => false,
                         },

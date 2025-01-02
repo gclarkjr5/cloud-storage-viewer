@@ -10,6 +10,7 @@ pub struct ResultsPager {
     pub num_pages: usize,
     pub total_results: usize,
     pub paged_item: String,
+    pub remainder: usize,
 }
 
 impl ResultsPager {
@@ -20,22 +21,32 @@ impl ResultsPager {
             num_pages: 1,
             total_results: 0,
             paged_item: "CloudFS".to_string(),
+            remainder: 0,
         }
     }
 
-    pub fn init(
-        &mut self,
-        results_per_page: usize,
-        page_idx: usize,
-        num_pages: usize,
-        total_results: usize,
-        paged_item: String,
-    ) {
-        self.results_per_page = results_per_page;
-        self.page_idx = page_idx;
-        self.num_pages = num_pages;
-        self.total_results = total_results;
-        self.paged_item = paged_item;
+    pub fn init(&mut self, results: &Vec<u8>, selection: &str) {
+        let num_results = results.lines().count();
+
+        self.total_results = num_results;
+        self.paged_item = selection.to_string();
+        match (
+            num_results / self.results_per_page,
+            num_results % self.results_per_page,
+        ) {
+            (div, rem) if div < 1 => {
+                self.num_pages = 1;
+                self.remainder = rem;
+            }
+            (div, rem) if rem > 0 => {
+                self.num_pages = div + 1;
+                self.remainder = rem;
+            }
+            (div, rem) => {
+                self.num_pages = div;
+                self.remainder = rem;
+            }
+        }
     }
 }
 
@@ -47,10 +58,11 @@ pub struct Viewer {
 }
 
 impl Viewer {
-    pub fn new() -> Self {
-        let tree = Tree::new("CloudFS".to_string());
+    pub fn new(active_connection: &str) -> Self {
+        let tree = Tree::new(active_connection.to_string());
         let nodes = tree.nodes();
         let mut items = vec![];
+        let results_pager = ResultsPager::default();
 
         nodes
             .filter(|node| node.parent().is_none())
@@ -59,7 +71,7 @@ impl Viewer {
                 let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
                     .expect("error creating nodes under parent");
 
-                add_children(node, &mut ti, 0);
+                add_children(node, &mut ti, &mut results_pager.clone());
                 items.push(ti);
             });
 
@@ -67,27 +79,51 @@ impl Viewer {
             state: TreeState::default(),
             tree,
             items,
-            results_pager: ResultsPager::default(),
+            results_pager,
         }
     }
 
-    pub fn refresh_items(&mut self, path: Vec<String>) {
-        let (_, found_node) = self.find_node_to_append(path.clone()).unwrap();
-
-        // HOW DO WE REMOVE CHILDREN FROM A NODE
-        // self.tree
-        //     .get_mut(node_id)
-        //     .expect("error getting mutable node")
-        //     .detach();
-        self.items = self.make_items(self.tree.clone(), self.results_pager.page_idx);
+    pub fn increase_results_page(&mut self) -> Option<()> {
+        // only increase page idx if we are on a page less than the number of pages
+        if self.results_pager.page_idx + 1 < self.results_pager.num_pages {
+            self.results_pager.page_idx += 1;
+            Some(())
+        } else {
+            None
+        }
     }
 
-    pub fn make_items(
-        &mut self,
-        tree: Tree<String>,
-        page_idx: usize,
-    ) -> Vec<TreeItem<'static, String>> {
-        let nodes = tree.nodes();
+    // pub fn next_page(&mut self) -> bool {
+    //     true
+    // }
+
+    // pub fn previous_page(&mut self) -> bool {
+    //     true
+    // }
+
+    pub fn decrease_results_page(&mut self) -> Option<()> {
+        // only decrease page idx if we are on a page higher than 1
+        if self.results_pager.page_idx + 1 > 1 {
+            self.results_pager.page_idx -= 1;
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    // pub fn refresh_items(&mut self, path: Vec<String>) {
+    //     let (_, found_node) = self.find_node_to_append(path.clone()).unwrap();
+
+    //     // HOW DO WE REMOVE CHILDREN FROM A NODE
+    //     // self.tree
+    //     //     .get_mut(node_id)
+    //     //     .expect("error getting mutable node")
+    //     //     .detach();
+    //     self.items = self.make_items(self.tree.clone(), self.results_pager.page_idx);
+    // }
+
+    pub fn make_items(&mut self) -> Vec<TreeItem<'static, String>> {
+        let nodes = self.tree.nodes();
         let mut root_vec = vec![];
 
         nodes
@@ -97,20 +133,22 @@ impl Viewer {
                 let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
                     .expect("error creating nodes under parent");
 
-                self.results_pager.num_pages = add_children(node, &mut ti, page_idx);
+                let mut results_pager = self.results_pager.clone();
+
+                add_children(node, &mut ti, &mut results_pager);
                 root_vec.push(ti);
             });
 
         root_vec
     }
 
-    pub fn list_items(&mut self, path: Vec<String>, page_idx: usize) -> Option<()> {
-        let found_node = self.find_node_to_append(path.clone());
-
+    pub fn list_items(&mut self, path: Vec<String>, action: &str) -> Option<()> {
+        // find node, verify, unwrap, and set pager
+        let found_node = self.find_node_to_append(path.clone(), action);
         found_node.as_ref()?;
-
         let (view_selection, node_to_append_to) = found_node.unwrap();
-        self.results_pager.paged_item = view_selection.clone();
+
+        // is the selection a directory?
         let is_directory = view_selection
             .chars()
             .last()
@@ -119,8 +157,15 @@ impl Viewer {
 
         match is_directory {
             true => {
+                // if so
+                // list it
+                // self.results_pager.paged_item = view_selection.clone();
                 let output = self.cli_command("gsutil", vec!["ls", view_selection.as_str()]);
 
+                // set the pager
+                self.results_pager.init(&output, &view_selection);
+
+                // add nodes to tree
                 output.lines().for_each(|listing| {
                     let res = listing.expect("error getting listing from stdout");
                     self.tree
@@ -128,33 +173,67 @@ impl Viewer {
                         .expect("error getting mutable node")
                         .append(res);
                 });
-                self.items = self.make_items(self.tree.clone(), page_idx);
+
+                // remake tree widget
+                self.items = self.make_items();
                 None
             }
-            false => None,
+            false => {
+                // coming from listing the root connection, making buckets
+                let output = self.cli_command("gsutil", vec!["ls"]);
+
+                // set the pager
+                self.results_pager
+                    .init(&output, &self.results_pager.paged_item.clone());
+
+                // add nodes to tree
+                output.lines().for_each(|listing| {
+                    let res = listing.expect("error getting listing from stdout");
+                    self.tree
+                        .get_mut(node_to_append_to)
+                        .expect("error getting mutable node")
+                        .append(res);
+                });
+
+                // remake tree widget
+                self.items = self.make_items();
+
+                None
+            }
         }
     }
 
     pub fn find_node_to_append(
         &mut self,
         path_identifier: Vec<String>,
+        action: &str,
     ) -> Option<(String, NodeId)> {
+        // take path identifier and grab last item
         let selected = path_identifier
             .iter()
             .last()
             .expect("error getting selected item")
             .as_str();
 
+        // use the selction to find the node in the tree
         let found_node = self.tree.nodes().find(|node| node.value() == selected);
 
         found_node.as_ref()?;
-
         let node = found_node.expect("error unwrapping found node");
 
-        if node.has_children() {
+        // if node already has children, we wont don anything
+        // match action {
+        //     "request" => {
+        //         if node.has_children() {
+        //             return None;
+        //         }
+        //     }
+        // }
+        if node.has_children() && action == "request" {
             return None;
         }
 
+        // return the selction and the node id
         Some((selected.to_string(), node.id()))
     }
 
@@ -167,39 +246,39 @@ impl Viewer {
     }
 }
 
-fn add_children(node: NodeRef<String>, tree_item: &mut TreeItem<String>, page_idx: usize) -> usize {
+fn add_children(
+    node: NodeRef<String>,
+    tree_item: &mut TreeItem<String>,
+    results_pager: &mut ResultsPager,
+) {
     if node.has_children() {
         let num_node_children = node.children().count();
 
-        // viewer.results_pager.total_results = num_node_children;
-        // viewer.results_pager.paged_item = tree_item.identifier().clone();
-        // let rp = ResultsPager::default();
-        // let results_pager = rp.init(
-        //     20,
-        //     page_idx,
-        //     rp.num_pages,
-        //     num_node_children,
-        //     tree_item.identifier().clone(),
-        // );
-
-        if num_node_children > 20 {
+        // if there are more children than the allowed results per page, page the results
+        if num_node_children > results_pager.results_per_page {
+            // collect children into a vec of vecs of specified chunk size
             let node_children_vec: Vec<NodeRef<String>> = node.children().collect();
             let node_children_pages: Vec<Vec<NodeRef<String>>> = node_children_vec
-                .chunks(20)
+                .chunks(results_pager.results_per_page)
                 .map(|chunk| chunk.to_vec())
                 .collect();
 
-            let num_pages = node_children_pages.len();
+            // gather number of pages
+            results_pager.num_pages = node_children_pages.len();
 
-            if page_idx < num_pages {
-                let page_of_children = node_children_pages[page_idx].clone();
+            // while current page is not the last,
+            if results_pager.page_idx < results_pager.num_pages {
+                // only get the inner vec of children of the current page index
+                let page_of_children = node_children_pages[results_pager.page_idx].clone();
+
+                // for each child in this inner vec, we will create tree items
                 page_of_children
                     .iter()
-                    .enumerate()
-                    .for_each(|(child_idx, n)| {
+                    // .enumerate()
+                    .for_each(|n| {
+                        // prettify child text
                         let child_val = n.value().to_string();
                         let split_text = child_val.split('/');
-
                         let clean_text = if split_text.clone().count() <= 4 {
                             child_val.clone()
                         } else if split_text.clone().last().unwrap() == "" {
@@ -212,33 +291,11 @@ fn add_children(node: NodeRef<String>, tree_item: &mut TreeItem<String>, page_id
                             TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
                                 .expect("error creating child node");
 
-                        add_children(*n, &mut child_ti, page_idx);
+                        add_children(*n, &mut child_ti, &mut results_pager.clone());
                         tree_item
                             .add_child(child_ti)
                             .expect("error adding child to the tree item");
-
-                        // if not last page, add ... Press 'L' for next page ...
-                        if page_idx + 1 < num_pages {
-                            // not on last page yet
-                            if child_idx + 1 == 20 {
-                                // add delimiter
-
-                                let next_page_text = "... Press 'L' for next page ...".to_string();
-                                let delim_ti =
-                                    TreeItem::new(next_page_text.clone(), next_page_text, vec![])
-                                        .expect("error creating child node");
-
-                                tree_item
-                                    .add_child(delim_ti)
-                                    .expect("error adding delimiter to the tree item");
-                            }
-                        } else {
-                            {}
-                        }
                     });
-                num_pages
-            } else {
-                num_pages
             }
         } else {
             node.children().for_each(|n| {
@@ -255,14 +312,11 @@ fn add_children(node: NodeRef<String>, tree_item: &mut TreeItem<String>, page_id
 
                 let mut child_ti = TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
                     .expect("error creating child node");
-                add_children(n, &mut child_ti, page_idx);
+                add_children(n, &mut child_ti, &mut results_pager.clone());
                 tree_item
                     .add_child(child_ti)
                     .expect("error adding child to the tree item");
             });
-            1_usize
         }
-    } else {
-        1_usize
     }
 }

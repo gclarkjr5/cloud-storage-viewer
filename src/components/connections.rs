@@ -46,6 +46,28 @@ impl Connections {
         }
     }
 
+    pub fn activate_connection(&mut self, path_identifier: Option<Vec<String>>) -> bool {
+        let new_config_name = path_identifier
+            .expect("error getting path ident")
+            .last()
+            .unwrap()
+            .clone();
+
+        // already on active connectinon
+        if Some(new_config_name.clone()) == self.active {
+            return true;
+        }
+
+        Command::new("gcloud")
+            .args(["config", "configurations", "activate"])
+            .arg(new_config_name.clone())
+            .output()
+            .expect("error creating new gcloud config");
+
+        self.active = GcloudConfig::get_active_config();
+        true
+    }
+
     pub fn make_items(
         &mut self,
         tree: Tree<String>,
@@ -70,13 +92,11 @@ impl Connections {
 
     pub fn list_items(&mut self, path: Vec<String>) -> Option<()> {
         // find the node to append to
-        let found_node = find_node_to_append(self.tree.clone(), path);
+        let found_node = self.find_node_to_append(path.clone());
 
         // if empty dont do anything
         found_node.as_ref()?;
-        // if found_node.is_none() {
-        //     return None;
-        // }
+
         let (selected, node_to_append_to) = found_node.unwrap();
 
         // get gcloud config path
@@ -85,6 +105,7 @@ impl Connections {
             .join(".config/gcloud/configurations");
 
         // if at cloud level, list children which are essentially cli configs for that cloud
+        // else, its an account so we should list the buckets of that account
         match selected.as_str() {
             "Azure Data Lake Storage" => None,
             "Google Cloud Storage" => {
@@ -114,26 +135,51 @@ impl Connections {
             "AWS S3" => None,
             "Connections" => None,
             _ => {
+                // if that account is not the active one
                 if selected != self.active.clone().unwrap() {
+                    // activate it
+                    self.activate_connection(Some(path));
+                    // TODO: clear the viewer
+                    // TODO: list the items
                     None
                 } else {
+                    // pass this back to app as a clue to list items from connections
+                    // but send them to the viewer
                     Some(())
                 }
             }
         }
+    }
+
+    pub fn find_node_to_append(
+        &mut self,
+        // tree: Tree<String>,
+        path_identifier: Vec<String>,
+    ) -> Option<(String, NodeId)> {
+        let selected = path_identifier
+            .iter()
+            .last()
+            .expect("error getting selected item")
+            .as_str();
+
+        let found_node = self.tree.nodes().find(|node| node.value() == selected);
+        // .expect("error finding node");
+
+        found_node?;
+
+        let node = found_node.expect("error unwrapping found node");
+
+        if node.has_children() {
+            return None;
+        }
+
+        Some((selected.to_string(), node.id()))
     }
 }
 
 fn add_children(node: NodeRef<String>, tree_item: &mut TreeItem<String>, page_idx: usize) {
     if node.has_children() {
         let num_node_children = node.children().count();
-
-        // let results_pager = ResultsPager::new(
-        //     20,
-        //     page_idx,
-        //     num_node_children,
-        //     tree_item.identifier().clone(),
-        // );
 
         if num_node_children > 20 {
             let node_children_vec: Vec<NodeRef<String>> = node.children().collect();
@@ -142,7 +188,7 @@ fn add_children(node: NodeRef<String>, tree_item: &mut TreeItem<String>, page_id
                 .map(|chunk| chunk.to_vec())
                 .collect();
 
-            let num_pages = node_children_pages.iter().count();
+            let num_pages = node_children_pages.len();
 
             let page_of_children = node_children_pages[page_idx].clone();
 
@@ -210,32 +256,6 @@ fn add_children(node: NodeRef<String>, tree_item: &mut TreeItem<String>, page_id
             })
         }
     }
-}
-
-fn find_node_to_append(
-    tree: Tree<String>,
-    path_identifier: Vec<String>,
-) -> Option<(String, NodeId)> {
-    let selected = path_identifier
-        .iter()
-        .last()
-        .expect("error getting selected item")
-        .as_str();
-
-    let found_node = tree.nodes().find(|node| node.value() == selected);
-    // .expect("error finding node");
-
-    if found_node.is_none() {
-        return None;
-    };
-
-    let node = found_node.expect("error unwrapping found node");
-
-    if node.has_children() {
-        return None;
-    }
-
-    Some((selected.to_string(), node.id()))
 }
 
 fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {

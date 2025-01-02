@@ -5,8 +5,8 @@ use std::process::Command;
 pub struct GcloudConfig {
     name: String,
     is_active: String,
-    account: String,
-    project: String,
+    // account: String,
+    // project: String,
 }
 
 impl GcloudConfig {
@@ -28,8 +28,8 @@ impl GcloudConfig {
                 Self {
                     name: splits[0].clone(),
                     is_active: splits[1].clone(),
-                    account: splits[2].clone(),
-                    project: splits[3].clone(),
+                    // account: splits[2].clone(),
+                    // project: splits[3].clone(),
                 }
             })
             .collect::<Vec<Self>>()

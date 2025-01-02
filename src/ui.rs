@@ -1,3 +1,4 @@
+// use color_eyre::owo_colors::OwoColorize;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -111,10 +112,6 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
         ])
         .split(footer);
 
-    // let footer_block = Block::default()
-    //     .borders(Borders::ALL)
-    //     .style(Style::default());
-
     let active_connection = footer_chunks[0];
     let commands = footer_chunks[1];
     let quit_and_close = footer_chunks[2];
@@ -152,13 +149,18 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
             )
         }
         Focus::Viewer => {
-            let viewer_commands = vec![
-                "Viewer Commands: ".into(),
+            let mut viewer_commands = vec![
                 "Switch to Connections=".into(),
                 "[Tab] ".blue(),
                 "List Items=".into(),
-                "[Enter]".blue(),
+                "[Enter] ".blue(),
             ];
+            if app.viewer.results_pager.num_pages > 1 {
+                viewer_commands.push("Next Page=".into());
+                viewer_commands.push("[Ctrl+l] ".blue());
+                viewer_commands.push("Previous Page=".into());
+                viewer_commands.push("[Ctrl+h] ".blue());
+            }
             Paragraph::new(Line::from(viewer_commands)).block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -182,28 +184,6 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
 
     /////////////////////////////////////
 
-    // let mode_footer = Paragraph::new(Line::from(current_navigation_text))
-    // .block(Block::default().borders(Borders::ALL));
-
-    // let current_keys_hint = {
-    //     match app.focus {
-    //         Focus::Main => Span::styled(
-    //             "(q) to quit / (e) to make new pair",
-    //             Style::default().fg(Color::Red),
-    //         ),
-    //         Focus::Editing => Span::styled(
-    //             "(ESC) to cancel/(Tab) to switch boxes/enter to complete",
-    //             Style::default().fg(Color::Red),
-    //         ),
-    //         Focus::Exiting => Span::styled(
-    //             "(q) to quit / (e) to make new pair",
-    //             Style::default().fg(Color::Red),
-    //         ),
-    //     }
-    // };
-
-    // frame.render_widget(footer_widget, footer);
-
     let last_render_took = before.elapsed();
     // Performance info in top right corner
     {
@@ -224,28 +204,35 @@ pub fn ui(frame: &mut Frame, app: &mut App, before: &Instant) {
             area,
         );
     }
-    {
-        // let text = format()" placing possible pagination stuff here".to_string();
-        let text = format!(
+    if app.viewer.results_pager.num_pages > 1 {
+        let paging_commands = format!(
             "currently paging: {}
             page: {} of {}
-            total results: {}",
+            showing: {} of {}",
             app.viewer.results_pager.paged_item,
             app.viewer.results_pager.page_idx + 1,
             app.viewer.results_pager.num_pages,
+            app.viewer.results_pager.results_per_page,
             app.viewer.results_pager.total_results,
         );
 
         #[allow(clippy::cast_possible_truncation)]
-        let area = Rect {
+        let paging_area = Rect {
             y: content.height - 2,
-            height: 3,
-            x: frame.area().width.saturating_sub(text.len() as u16),
-            width: text.len() as u16,
+            height: 10,
+            x: frame
+                .area()
+                .width
+                .saturating_sub(paging_commands.len() as u16),
+            width: paging_commands.len() as u16,
         };
         frame.render_widget(
-            Span::styled(text, Style::new().fg(Color::Black).bg(Color::Gray)),
-            area,
+            Span::styled(
+                paging_commands,
+                Style::new().fg(Color::Black).bg(Color::Gray),
+            ),
+            // Paragraph::new(text),
+            paging_area,
         );
     }
 }
