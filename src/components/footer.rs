@@ -87,9 +87,9 @@ impl Component for Footer {
                 ];
                 if self.results_pager.num_pages > 1 {
                     viewer_commands.push("Next Page=".into());
-                    viewer_commands.push("[Ctrl+l/->] ".blue());
+                    viewer_commands.push("[Ctrl+l] ".blue());
                     viewer_commands.push("Previous Page=".into());
-                    viewer_commands.push("[Ctrl+h/<-] ".blue());
+                    viewer_commands.push("[Ctrl+h] ".blue());
                 }
                 Paragraph::new(Line::from(viewer_commands)).block(
                     Block::default()
