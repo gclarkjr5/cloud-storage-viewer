@@ -275,31 +275,6 @@ impl Component for Viewer {
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        mouse_event: crossterm::event::MouseEvent,
-        focus: Focus,
-    ) -> Result<Option<Action>> {
-        match focus {
-            Focus::Viewer => match mouse_event.kind {
-                MouseEventKind::ScrollDown => {
-                    self.state.scroll_down(1);
-                    Ok(Some(Action::Nothing))
-                }
-                MouseEventKind::ScrollUp => {
-                    self.state.scroll_up(1);
-                    Ok(Some(Action::Nothing))
-                }
-                MouseEventKind::Down(_button) => {
-                    self.state
-                        .click_at(Position::new(mouse_event.column, mouse_event.row));
-                    Ok(Some(Action::Nothing))
-                }
-                _ => Ok(Some(Action::Nothing)),
-            },
-            _ => Ok(Some(Action::Nothing)),
-        }
-    }
     fn handle_key_event(&mut self, key: Key, focus: Focus) -> Result<Option<Action>> {
         match focus {
             Focus::Viewer => {
@@ -362,15 +337,43 @@ impl Component for Viewer {
                     Ok(None)
                 } else if key == self.config.key_config.next_page {
                     self.increase_results_page();
+                    self.items = self.make_items();
                     Ok(Some(Action::Nothing))
                 } else if key == self.config.key_config.previous_page {
                     self.decrease_results_page();
+                    self.items = self.make_items();
                     Ok(Some(Action::Nothing))
                 } else {
                     Ok(None)
                 }
             }
             _ => Ok(None),
+        }
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        mouse_event: crossterm::event::MouseEvent,
+        focus: Focus,
+    ) -> Result<Option<Action>> {
+        match focus {
+            Focus::Viewer => match mouse_event.kind {
+                MouseEventKind::ScrollDown => {
+                    self.state.scroll_down(1);
+                    Ok(Some(Action::Nothing))
+                }
+                MouseEventKind::ScrollUp => {
+                    self.state.scroll_up(1);
+                    Ok(Some(Action::Nothing))
+                }
+                MouseEventKind::Down(_button) => {
+                    self.state
+                        .click_at(Position::new(mouse_event.column, mouse_event.row));
+                    Ok(Some(Action::Nothing))
+                }
+                _ => Ok(Some(Action::Nothing)),
+            },
+            _ => Ok(Some(Action::Nothing)),
         }
     }
 
@@ -402,7 +405,7 @@ impl Component for Viewer {
                 Style::default()
             })
             .experimental_scrollbar(Some(
-                Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(None)
                     .track_symbol(None)
                     .end_symbol(None),
@@ -447,16 +450,16 @@ fn add_children(
     if node.has_children() {
         let num_node_children = node.children().count();
 
-        // if there are more children than the allowed results per page, page the results
+        // // if there are more children than the allowed results per page, page the results
         if num_node_children > results_pager.results_per_page {
-            // collect children into a vec of vecs of specified chunk size
+            // collect children into a vec of vecs of chunk size specified in pager
             let node_children_vec: Vec<NodeRef<String>> = node.children().collect();
             let node_children_pages: Vec<Vec<NodeRef<String>>> = node_children_vec
                 .chunks(results_pager.results_per_page)
                 .map(|chunk| chunk.to_vec())
                 .collect();
 
-            // gather number of pages
+            // save number of pages
             results_pager.num_pages = node_children_pages.len();
 
             // while current page is not the last,
