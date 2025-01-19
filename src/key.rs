@@ -140,16 +140,6 @@ impl From<event::KeyEvent> for Key {
                 ..
             } => Key::Backspace,
             event::KeyEvent {
-                code: KeyCode::Right,
-                modifiers: event::KeyModifiers::CONTROL,
-                ..
-            } => Key::Ctrl('>'),
-            event::KeyEvent {
-                code: KeyCode::Left,
-                modifiers: event::KeyModifiers::CONTROL,
-                ..
-            } => Key::Ctrl('<'),
-            event::KeyEvent {
                 code: event::KeyCode::Left,
                 ..
             } => Key::Left,

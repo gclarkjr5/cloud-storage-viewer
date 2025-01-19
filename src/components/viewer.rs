@@ -1,6 +1,6 @@
 use std::{io::BufRead, io::Result, process::Command};
 
-use crossterm::event::MouseEventKind;
+use crossterm::event::{KeyModifiers, MouseEventKind};
 use ego_tree::{NodeId, NodeRef, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -360,22 +360,10 @@ impl Component for Viewer {
                     let data = cli_command("gsutil", vec!["ls", selected.last().unwrap()]);
                     self.list_items(data, selected)?;
                     Ok(None)
-                } else if [
-                    self.config.key_config.next_page,
-                    self.config.key_config.next_page_arrow,
-                ]
-                .iter()
-                .any(|kc| kc == &key)
-                {
+                } else if key == self.config.key_config.next_page {
                     self.increase_results_page();
                     Ok(Some(Action::Nothing))
-                } else if [
-                    self.config.key_config.previous_page,
-                    self.config.key_config.previous_page_arrow,
-                ]
-                .iter()
-                .any(|kc| kc == &key)
-                {
+                } else if key == self.config.key_config.previous_page {
                     self.decrease_results_page();
                     Ok(Some(Action::Nothing))
                 } else {
