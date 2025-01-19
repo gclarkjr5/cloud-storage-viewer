@@ -1,11 +1,11 @@
 use std::{io::BufRead, io::Result, process::Command};
 
-use crossterm::event::{KeyModifiers, MouseEventKind};
+use crossterm::event::MouseEventKind;
 use ego_tree::{NodeId, NodeRef, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Borders, Clear, Paragraph};
+use ratatui::text::Span;
+use ratatui::widgets::Clear;
 use ratatui::{
     layout::Rect,
     widgets::{Block, Scrollbar, ScrollbarOrientation},
@@ -211,7 +211,7 @@ impl Component for Viewer {
 
         let is_directory = selection.chars().last().expect("error getting last char") == '/';
 
-        self.results_pager.init(&data, &selection);
+        self.results_pager.init(&data, path.clone());
 
         match is_directory {
             true => {
@@ -338,10 +338,12 @@ impl Component for Viewer {
                 } else if key == self.config.key_config.next_page {
                     self.increase_results_page();
                     self.items = self.make_items();
+                    self.state.select(self.results_pager.paged_item.clone());
                     Ok(Some(Action::Nothing))
                 } else if key == self.config.key_config.previous_page {
                     self.decrease_results_page();
                     self.items = self.make_items();
+                    self.state.select(self.results_pager.paged_item.clone());
                     Ok(Some(Action::Nothing))
                 } else {
                     Ok(None)
@@ -419,7 +421,7 @@ impl Component for Viewer {
                 "currently paging: {}
                     page: {} of {}
                     showing: {} of {}",
-                self.results_pager.paged_item,
+                self.results_pager.paged_item.last().unwrap(),
                 self.results_pager.page_idx + 1,
                 self.results_pager.num_pages,
                 self.results_pager.results_per_page,

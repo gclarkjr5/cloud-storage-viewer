@@ -30,7 +30,7 @@ impl Component for Footer {
     }
 
     fn list_items(&mut self, data: Vec<u8>, _path: Vec<String>) -> Result<()> {
-        self.results_pager.init(&data, "");
+        self.results_pager.init(&data, Vec::new());
         Ok(())
     }
 

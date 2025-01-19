@@ -6,7 +6,7 @@ pub struct ResultsPager {
     pub page_idx: usize,
     pub num_pages: usize,
     pub total_results: usize,
-    pub paged_item: String,
+    pub paged_item: Vec<String>,
     pub remainder: usize,
 }
 
@@ -17,19 +17,19 @@ impl Default for ResultsPager {
             page_idx: 0,
             num_pages: 0,
             total_results: 0,
-            paged_item: String::new(),
+            paged_item: Vec::new(),
             remainder: 0,
         }
     }
 }
 
 impl ResultsPager {
-    pub fn init(&mut self, results: &Vec<u8>, selection: &str) {
+    pub fn init(&mut self, results: &Vec<u8>, selection: Vec<String>) {
         // take results and see how many there are
         let num_results = results.lines().count();
 
         self.total_results = num_results;
-        self.paged_item = selection.to_string();
+        self.paged_item = selection;
 
         match (
             num_results / self.results_per_page,
