@@ -15,39 +15,22 @@ use crate::{
     },
 };
 
-use super::Component;
+use super::{results_pager::ResultsPager, Component};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Footer {
-    // pub _key_config: KeyConfig,
     pub config: Config,
-    // pub active: Option<String>,
-}
-
-impl Default for Footer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Footer {
-    pub fn new() -> Self {
-        Self {
-            // _key_config: KeyConfig::default(),
-            config: Config::default(),
-        }
-    }
+    pub results_pager: ResultsPager,
 }
 
 impl Component for Footer {
-    fn init(&mut self) -> Result<()> {
-        // self.config.get_cloud_config();
-        // self.active = Some("active connection".to_string());
+    fn register_config(&mut self, config: Config) -> Result<()> {
+        self.config = config;
         Ok(())
     }
 
-    fn register_config(&mut self, config: Config) -> Result<()> {
-        self.config = config;
+    fn list_items(&mut self, data: Vec<u8>, _path: Vec<String>) -> Result<()> {
+        self.results_pager.init(&data, "");
         Ok(())
     }
 
@@ -96,18 +79,18 @@ impl Component for Footer {
                 )
             }
             Focus::Viewer => {
-                let viewer_commands = vec![
+                let mut viewer_commands = vec![
                     "Switch to Connections=".into(),
                     "[Tab] ".blue(),
                     "List Items=".into(),
                     "[Enter] ".blue(),
                 ];
-                // if app.viewer.results_pager.num_pages > 1 {
-                //     viewer_commands.push("Next Page=".into());
-                //     viewer_commands.push("[Ctrl+l] ".blue());
-                //     viewer_commands.push("Previous Page=".into());
-                //     viewer_commands.push("[Ctrl+h] ".blue());
-                // }
+                if self.results_pager.num_pages > 1 {
+                    viewer_commands.push("Next Page=".into());
+                    viewer_commands.push("[Ctrl+l/->] ".blue());
+                    viewer_commands.push("Previous Page=".into());
+                    viewer_commands.push("[Ctrl+h/<-] ".blue());
+                }
                 Paragraph::new(Line::from(viewer_commands)).block(
                     Block::default()
                         .borders(Borders::ALL)

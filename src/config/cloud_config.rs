@@ -18,7 +18,7 @@ impl Display for CloudConfig {
                 .unwrap()
                 .get_active_config();
 
-            write!(f, "{cloud}({ac})")
+            write!(f, "{ac}({cloud})")
         } else {
             write!(f, "No Active Cloud Provider")
         }

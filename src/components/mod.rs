@@ -6,6 +6,7 @@ use ratatui::{layout::Rect, Frame};
 
 pub mod connections;
 pub mod footer;
+pub mod results_pager;
 pub mod viewer;
 
 // pub trait DrawableComponent {
@@ -17,7 +18,9 @@ pub mod viewer;
 // }
 
 pub trait Component {
-    fn init(&mut self) -> Result<()>;
+    fn init(&mut self) -> Result<()> {
+        Ok(())
+    }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<()>;
     // fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {

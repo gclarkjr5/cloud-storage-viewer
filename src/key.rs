@@ -1,4 +1,4 @@
-use crossterm::event;
+use crossterm::event::{self, KeyCode};
 use serde::Deserialize;
 use std::fmt;
 
@@ -140,6 +140,16 @@ impl From<event::KeyEvent> for Key {
                 ..
             } => Key::Backspace,
             event::KeyEvent {
+                code: KeyCode::Right,
+                modifiers: event::KeyModifiers::CONTROL,
+                ..
+            } => Key::Ctrl('>'),
+            event::KeyEvent {
+                code: KeyCode::Left,
+                modifiers: event::KeyModifiers::CONTROL,
+                ..
+            } => Key::Ctrl('<'),
+            event::KeyEvent {
                 code: event::KeyCode::Left,
                 ..
             } => Key::Left,
@@ -203,7 +213,6 @@ impl From<event::KeyEvent> for Key {
                 modifiers: event::KeyModifiers::CONTROL,
                 ..
             } => Key::Ctrl(c),
-
             event::KeyEvent {
                 code: event::KeyCode::Char(c),
                 ..

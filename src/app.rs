@@ -38,7 +38,7 @@ impl App {
             components: vec![
                 Box::new(Connections::new()),
                 Box::new(Viewer::default()),
-                Box::new(Footer::new()),
+                Box::new(Footer::default()),
             ],
             focus: Focus::Connections,
             config: Config::default(),

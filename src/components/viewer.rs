@@ -4,7 +4,8 @@ use crossterm::event::MouseEventKind;
 use ego_tree::{NodeId, NodeRef, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::widgets::Clear;
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Borders, Clear, Paragraph};
 use ratatui::{
     layout::Rect,
     widgets::{Block, Scrollbar, ScrollbarOrientation},
@@ -14,58 +15,11 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::action::Action;
 use crate::app::Focus;
-use crate::config::cloud_config::{CloudProvider, GcsConfig};
 use crate::config::Config;
 use crate::key::Key;
 
+use super::results_pager::ResultsPager;
 use super::Component;
-
-#[derive(Debug, Clone, Default)]
-pub struct ResultsPager {
-    pub results_per_page: usize,
-    pub page_idx: usize,
-    pub num_pages: usize,
-    pub _total_results: usize,
-    pub _paged_item: String,
-    pub _remainder: usize,
-}
-
-impl ResultsPager {
-    pub fn default() -> Self {
-        Self {
-            results_per_page: 20,
-            page_idx: 0,
-            num_pages: 1,
-            _total_results: 0,
-            _paged_item: "CloudFS".to_string(),
-            _remainder: 0,
-        }
-    }
-
-    pub fn init(&mut self, results: &Vec<u8>, selection: &str) {
-        let num_results = results.lines().count();
-
-        self._total_results = num_results;
-        self._paged_item = selection.to_string();
-        match (
-            num_results / self.results_per_page,
-            num_results % self.results_per_page,
-        ) {
-            (div, rem) if div < 1 => {
-                self.num_pages = 1;
-                self._remainder = rem;
-            }
-            (div, rem) if rem > 0 => {
-                self.num_pages = div + 1;
-                self._remainder = rem;
-            }
-            (div, rem) => {
-                self.num_pages = div;
-                self._remainder = rem;
-            }
-        }
-    }
-}
 
 pub struct Viewer {
     pub config: Config,
@@ -173,67 +127,6 @@ impl Viewer {
         root_vec
     }
 
-    // pub fn list_items(&mut self, path: Vec<String>, action: &str) -> Option<()> {
-    //     // find node, verify, unwrap, and set pager
-    //     let found_node = self.find_node_to_append(path.clone(), action);
-    //     found_node.as_ref()?;
-    //     let (view_selection, node_to_append_to) = found_node.unwrap();
-
-    //     // is the selection a directory?
-    //     let is_directory = view_selection
-    //         .chars()
-    //         .last()
-    //         .expect("error getting last char")
-    //         == '/';
-
-    //     match is_directory {
-    //         true => {
-    //             // if so
-    //             // list it
-    //             // self.results_pager.paged_item = view_selection.clone();
-    //             let output = self.cli_command("gsutil", vec!["ls", view_selection.as_str()]);
-
-    //             // set the pager
-    //             self.results_pager.init(&output, &view_selection);
-
-    //             // add nodes to tree
-    //             output.lines().for_each(|listing| {
-    //                 let res = listing.expect("error getting listing from stdout");
-    //                 self.tree
-    //                     .get_mut(node_to_append_to)
-    //                     .expect("error getting mutable node")
-    //                     .append(res);
-    //             });
-
-    //             // remake tree widget
-    //             self.items = self.make_items();
-    //             None
-    //         }
-    //         false => {
-    //             // coming from listing the root connection, making buckets
-    //             let output = self.cli_command("gsutil", vec!["ls"]);
-
-    //             // set the pager
-    //             self.results_pager
-    //                 .init(&output, &self.results_pager._paged_item.clone());
-
-    //             // add nodes to tree
-    //             output.lines().for_each(|listing| {
-    //                 let res = listing.expect("error getting listing from stdout");
-    //                 self.tree
-    //                     .get_mut(node_to_append_to)
-    //                     .expect("error getting mutable node")
-    //                     .append(res);
-    //             });
-
-    //             // remake tree widget
-    //             self.items = self.make_items();
-
-    //             None
-    //         }
-    //     }
-    // }
-
     pub fn find_node_to_append(&mut self, path: Vec<String>) -> Option<(String, NodeId)> {
         // use the selction to find the node in the tree
         let selection = path.last().unwrap();
@@ -258,14 +151,6 @@ impl Viewer {
         // return the selction and the node id
         Some((selection.clone(), node.id()))
     }
-
-    pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
-        Command::new(program)
-            .args(args)
-            .output()
-            .expect("error processing command")
-            .stdout
-    }
 }
 
 pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
@@ -275,32 +160,6 @@ pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
         .expect("error processing command")
         .stdout
 }
-
-// impl StatefulDrawableComponent for Viewer {
-//     fn draw(&mut self, frame: &mut Frame, area: Rect, focused: bool) -> Result<()> {
-//         let widget = Tree::new(&self.items)
-//             .expect("all item identifieers are unique")
-//             .block(
-//                 Block::bordered()
-//                     .title("Cloud Viewer")
-//                     .border_style(if focused {
-//                         Style::new().blue()
-//                     } else {
-//                         Style::default()
-//                     }),
-//             )
-//             .experimental_scrollbar(Some(
-//                 Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
-//                     .begin_symbol(None)
-//                     .track_symbol(None)
-//                     .end_symbol(None),
-//             ));
-
-//         frame.render_widget(Clear, area);
-//         frame.render_stateful_widget(widget, area, &mut self.state);
-//         Ok(())
-//     }
-// }
 
 impl Component for Viewer {
     fn init(&mut self) -> Result<()> {
@@ -352,6 +211,8 @@ impl Component for Viewer {
 
         let is_directory = selection.chars().last().expect("error getting last char") == '/';
 
+        self.results_pager.init(&data, &selection);
+
         match is_directory {
             true => {
                 data.lines().for_each(|listing| {
@@ -380,56 +241,11 @@ impl Component for Viewer {
         }
 
         self.state.open(path);
-        // is the selection a directory?
-
-        // match is_directory {
-        //     true => {
-        //         // if so
-        //         // list it
-        //         // self.results_pager.paged_item = view_selection.clone();
-        //         let output = self.cli_command("gsutil", vec!["ls", view_selection.as_str()]);
-
-        //         // set the pager
-        //         self.results_pager.init(&output, &view_selection);
-
-        //         // add nodes to tree
-        //         output.lines().for_each(|listing| {
-        //             let res = listing.expect("error getting listing from stdout");
-        //             self.tree
-        //                 .get_mut(node_to_append_to)
-        //                 .expect("error getting mutable node")
-        //                 .append(res);
-        //         });
-
-        //         // remake tree widget
-        //         self.items = self.make_items();
-        //         None
-        //     }
-        //     false => {
-        //         // coming from listing the root connection, making buckets
-        //         let output = self.cli_command("gsutil", vec!["ls"]);
-
-        //         // set the pager
-        //         self.results_pager
-        //             .init(&output, &self.results_pager._paged_item.clone());
-
-        //         // add nodes to tree
-        //         output.lines().for_each(|listing| {
-        //             let res = listing.expect("error getting listing from stdout");
-        //             self.tree
-        //                 .get_mut(node_to_append_to)
-        //                 .expect("error getting mutable node")
-        //                 .append(res);
-        //         });
-        //     }
-        // }
 
         // remake tree widget
         self.items = self.make_items();
 
         Ok(())
-        // }
-        // }
     }
 
     fn register_config(&mut self, config: Config) -> Result<()> {
@@ -544,6 +360,24 @@ impl Component for Viewer {
                     let data = cli_command("gsutil", vec!["ls", selected.last().unwrap()]);
                     self.list_items(data, selected)?;
                     Ok(None)
+                } else if [
+                    self.config.key_config.next_page,
+                    self.config.key_config.next_page_arrow,
+                ]
+                .iter()
+                .any(|kc| kc == &key)
+                {
+                    self.increase_results_page();
+                    Ok(Some(Action::Nothing))
+                } else if [
+                    self.config.key_config.previous_page,
+                    self.config.key_config.previous_page_arrow,
+                ]
+                .iter()
+                .any(|kc| kc == &key)
+                {
+                    self.decrease_results_page();
+                    Ok(Some(Action::Nothing))
                 } else {
                     Ok(None)
                 }
@@ -588,6 +422,31 @@ impl Component for Viewer {
 
         frame.render_widget(Clear, viewer);
         frame.render_stateful_widget(widget, viewer, &mut self.state);
+
+        if self.results_pager.num_pages > 1 {
+            let paging_info = format!(
+                "currently paging: {}
+                    page: {} of {}
+                    showing: {} of {}",
+                self.results_pager.paged_item,
+                self.results_pager.page_idx + 1,
+                self.results_pager.num_pages,
+                self.results_pager.results_per_page,
+                self.results_pager.total_results,
+            );
+            #[allow(clippy::cast_possible_truncation)]
+            let paging_area = Rect {
+                y: viewer.height - 2,
+                height: 10,
+                x: frame.area().width.saturating_sub(paging_info.len() as u16),
+                width: paging_info.len() as u16,
+            };
+            frame.render_widget(
+                Span::styled(paging_info, Style::new().fg(Color::Black).bg(Color::Gray)),
+                // Paragraph::new(text),
+                paging_area,
+            );
+        }
         Ok(())
     }
 }
