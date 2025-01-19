@@ -5,8 +5,6 @@ pub enum Action {
     Quit,
     ListConfiguration(CloudConfig, Vec<String>, Vec<u8>),
     ListCloudProvider(CloudConfig),
-    // NextPage,
-    // PreviousPage,
     ChangeFocus,
     Nothing,
     ActivateConfig(Vec<String>),

@@ -1,7 +1,7 @@
 use std::{io::BufRead, io::Result, process::Command};
 
 use crossterm::event::MouseEventKind;
-use ego_tree::{NodeId, NodeRef, Tree as ETree};
+use ego_tree::{NodeId, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::Span;
@@ -17,6 +17,7 @@ use crate::action::Action;
 use crate::app::Focus;
 use crate::config::Config;
 use crate::key::Key;
+use crate::util;
 
 use super::results_pager::ResultsPager;
 use super::Component;
@@ -55,7 +56,7 @@ impl Viewer {
                 let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
                     .expect("error creating nodes under parent");
 
-                add_children(node, &mut ti, &mut results_pager.clone());
+                util::add_children(node, &mut ti, &mut results_pager.clone());
                 items.push(ti);
             });
 
@@ -78,14 +79,6 @@ impl Viewer {
         }
     }
 
-    // pub fn next_page(&mut self) -> bool {
-    //     true
-    // }
-
-    // pub fn previous_page(&mut self) -> bool {
-    //     true
-    // }
-
     pub fn decrease_results_page(&mut self) -> Option<()> {
         // only decrease page idx if we are on a page higher than 1
         if self.results_pager.page_idx + 1 > 1 {
@@ -94,37 +87,6 @@ impl Viewer {
         } else {
             None
         }
-    }
-
-    // pub fn refresh_items(&mut self, path: Vec<String>) {
-    //     let (_, found_node) = self.find_node_to_append(path.clone()).unwrap();
-
-    //     // HOW DO WE REMOVE CHILDREN FROM A NODE
-    //     // self.tree
-    //     //     .get_mut(node_id)
-    //     //     .expect("error getting mutable node")
-    //     //     .detach();
-    //     self.items = self.make_items(self.tree.clone(), self.results_pager.page_idx);
-    // }
-
-    pub fn make_items(&mut self) -> Vec<TreeItem<'static, String>> {
-        let nodes = self.tree.nodes();
-        let mut root_vec = vec![];
-
-        nodes
-            .filter(|node| node.parent().is_none())
-            .for_each(|node| {
-                let val = node.value().to_string();
-                let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
-                    .expect("error creating nodes under parent");
-
-                let mut results_pager = self.results_pager.clone();
-
-                add_children(node, &mut ti, &mut results_pager);
-                root_vec.push(ti);
-            });
-
-        root_vec
     }
 
     pub fn find_node_to_append(&mut self, path: Vec<String>) -> Option<(String, NodeId)> {
@@ -136,14 +98,6 @@ impl Viewer {
         found_node.as_ref()?;
         let node = found_node.expect("error unwrapping found node");
 
-        // if node already has children, we wont don anything
-        // match action {
-        //     "request" => {
-        //         if node.has_children() {
-        //             return None;
-        //         }
-        //     }
-        // }
         if node.has_children() {
             return None;
         }
@@ -162,43 +116,6 @@ pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
 }
 
 impl Component for Viewer {
-    fn init(&mut self) -> Result<()> {
-        // let active_connection = self.config.name.clone();
-        // let active_conn = self
-        //     .config
-        //     .cloud_config
-        //     .available_clouds
-        //     .iter()
-        //     .find(|a| matches!(a, Cloud::Gcs(_)))
-        //     .unwrap();
-
-        // let mut g = GcsConn::default();
-        // if let Cloud::Gcs(config) = active_conn {
-        //     g = config.clone().active_conn;
-        // }
-        // let tree = ETree::new(g.name.to_string());
-        // let mut items = vec![];
-        // let results_pager = ResultsPager::default();
-
-        // let nodes = tree.nodes();
-        // nodes
-        //     .filter(|node| node.parent().is_none())
-        //     .for_each(|node| {
-        //         let val = node.value().to_string();
-        //         let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
-        //             .expect("error creating nodes under parent");
-
-        //         add_children(node, &mut ti, &mut results_pager.clone());
-        //         items.push(ti);
-        //     });
-
-        // self.tree = tree;
-        // self.items = items;
-        // self.results_pager = results_pager;
-
-        Ok(())
-    }
-
     fn list_items(&mut self, data: Vec<u8>, path: Vec<String>) -> Result<()> {
         // find node, verify, unwrap, and set pager
         let found_node = self.find_node_to_append(path.clone());
@@ -241,7 +158,7 @@ impl Component for Viewer {
         }
 
         // remake tree widget
-        self.items = self.make_items();
+        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager);
 
         self.state.open(path.clone());
         self.state.select(path);
@@ -266,7 +183,7 @@ impl Component for Viewer {
                 let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
                     .expect("error creating nodes under parent");
 
-                add_children(node, &mut ti, &mut results_pager.clone());
+                util::add_children(node, &mut ti, &mut results_pager.clone());
                 items.push(ti);
             });
 
@@ -338,12 +255,12 @@ impl Component for Viewer {
                     Ok(None)
                 } else if key == self.config.key_config.next_page {
                     self.increase_results_page();
-                    self.items = self.make_items();
+                    self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager);
                     self.state.select(self.results_pager.paged_item.clone());
                     Ok(Some(Action::Nothing))
                 } else if key == self.config.key_config.previous_page {
                     self.decrease_results_page();
-                    self.items = self.make_items();
+                    self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager);
                     self.state.select(self.results_pager.paged_item.clone());
                     Ok(Some(Action::Nothing))
                 } else {
@@ -437,85 +354,9 @@ impl Component for Viewer {
             };
             frame.render_widget(
                 Span::styled(paging_info, Style::new().fg(Color::Black).bg(Color::Gray)),
-                // Paragraph::new(text),
                 paging_area,
             );
         }
         Ok(())
-    }
-}
-
-fn add_children(
-    node: NodeRef<String>,
-    tree_item: &mut TreeItem<String>,
-    results_pager: &mut ResultsPager,
-) {
-    if node.has_children() {
-        let num_node_children = node.children().count();
-
-        // // if there are more children than the allowed results per page, page the results
-        if num_node_children > results_pager.results_per_page {
-            // collect children into a vec of vecs of chunk size specified in pager
-            let node_children_vec: Vec<NodeRef<String>> = node.children().collect();
-            let node_children_pages: Vec<Vec<NodeRef<String>>> = node_children_vec
-                .chunks(results_pager.results_per_page)
-                .map(|chunk| chunk.to_vec())
-                .collect();
-
-            // save number of pages
-            results_pager.num_pages = node_children_pages.len();
-
-            // while current page is not the last,
-            if results_pager.page_idx < results_pager.num_pages {
-                // only get the inner vec of children of the current page index
-                let page_of_children = node_children_pages[results_pager.page_idx].clone();
-
-                // for each child in this inner vec, we will create tree items
-                page_of_children
-                    .iter()
-                    // .enumerate()
-                    .for_each(|n| {
-                        // prettify child text
-                        let child_val = n.value().to_string();
-                        let split_text = child_val.split('/');
-                        let clean_text = if split_text.clone().count() <= 4 {
-                            child_val.clone()
-                        } else if split_text.clone().last().unwrap() == "" {
-                            split_text.rev().nth(1).unwrap().to_string() + "/"
-                        } else {
-                            split_text.last().unwrap().to_string()
-                        };
-
-                        let mut child_ti =
-                            TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
-                                .expect("error creating child node");
-
-                        add_children(*n, &mut child_ti, &mut results_pager.clone());
-                        tree_item
-                            .add_child(child_ti)
-                            .expect("error adding child to the tree item");
-                    });
-            }
-        } else {
-            node.children().for_each(|n| {
-                let child_val = n.value().to_string();
-                let split_text = child_val.split('/');
-
-                let clean_text = if split_text.clone().count() <= 4 {
-                    child_val.clone()
-                } else if split_text.clone().last().unwrap() == "" {
-                    split_text.rev().nth(1).unwrap().to_string() + "/"
-                } else {
-                    split_text.last().unwrap().to_string()
-                };
-
-                let mut child_ti = TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
-                    .expect("error creating child node");
-                add_children(n, &mut child_ti, &mut results_pager.clone());
-                tree_item
-                    .add_child(child_ti)
-                    .expect("error adding child to the tree item");
-            });
-        }
     }
 }

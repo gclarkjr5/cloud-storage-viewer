@@ -9,14 +9,6 @@ pub mod footer;
 pub mod results_pager;
 pub mod viewer;
 
-// pub trait DrawableComponent {
-//     fn draw<B: Backend>(&self, f: &mut Frame, area: Rect, focused: bool) -> Result<()>;
-// }
-
-// pub trait StatefulDrawableComponent {
-//     fn draw(&mut self, frame: &mut Frame, area: Rect, focused: bool) -> Result<()>;
-// }
-
 pub trait Component {
     fn init(&mut self) -> Result<()> {
         Ok(())
