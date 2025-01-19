@@ -7,7 +7,7 @@ use crossterm::{
 use ratatui::backend::CrosstermBackend as Backend;
 
 #[derive(Clone, Debug)]
-pub enum Event {
+pub enum _Event {
     Init,
     Quit,
     Error,
@@ -32,7 +32,7 @@ impl Tui {
 
     pub fn enter(&mut self) -> std::io::Result<()> {
         crossterm::terminal::enable_raw_mode()?;
-        crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture,);
+        crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture,)?;
 
         Ok(())
     }

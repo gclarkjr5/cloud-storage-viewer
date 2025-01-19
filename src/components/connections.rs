@@ -135,7 +135,7 @@ impl Connections {
 
         Ok(output)
     }
-    pub fn list_item(&mut self, path: Vec<String>) -> Result<Option<Action>> {
+    pub fn _list_item(&mut self, _path: Vec<String>) -> Result<Option<Action>> {
         // get cloud and conf
 
         // find the node to append to
@@ -148,9 +148,9 @@ impl Connections {
         // let (selected, node_to_append_to) = found_node.unwrap();
 
         // // get gcloud config path
-        let gcloud_configuration_dir = dirs::home_dir()
-            .unwrap()
-            .join(".config/gcloud/configurations");
+        // let gcloud_configuration_dir = dirs::home_dir()
+        //     .unwrap()
+        //     .join(".config/gcloud/configurations");
 
         // // if at cloud level, list children which are essentially cli configs for that cloud
         // // else, its an account so we should list the buckets of that account

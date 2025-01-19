@@ -1,4 +1,4 @@
-use crossterm::event::{self, KeyCode};
+use crossterm::event;
 use serde::Deserialize;
 use std::fmt;
 

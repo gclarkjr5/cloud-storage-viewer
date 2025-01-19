@@ -19,9 +19,9 @@ pub struct KeyConfig {
     pub next_page: Key,
     pub previous_page: Key,
     pub toggle_selected: Key,
-    pub unselect: Key, // ESC
-    pub page_down: Key,
-    pub page_up: Key,
+    // pub unselect: Key, // ESC
+    // pub page_down: Key,
+    // pub page_up: Key,
     pub list_item: Key,
 }
 
@@ -44,9 +44,9 @@ impl Default for KeyConfig {
             next_page: Key::Ctrl('l'),
             previous_page: Key::Ctrl('h'),
             toggle_selected: Key::Char(' '),
-            unselect: Key::Esc,
-            page_down: Key::Ctrl('f'),
-            page_up: Key::Ctrl('b'),
+            // unselect: Key::Esc,
+            // page_down: Key::Ctrl('f'),
+            // page_up: Key::Ctrl('b'),
             list_item: Key::Enter,
             change_focus: Key::Tab,
         }

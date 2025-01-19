@@ -8,7 +8,7 @@ use super::components::viewer::Viewer;
 use crate::action::Action;
 use crate::components::footer::Footer;
 use crate::components::Component as Comp;
-use crate::config::cloud_config::{self, CloudProvider};
+use crate::config::cloud_config::CloudProvider;
 use crate::config::Config;
 use crate::key::Key;
 use crate::tui::Tui;
@@ -121,7 +121,7 @@ impl App {
         Ok(())
     }
 
-    fn list_item(&mut self, selection: Vec<String>) {
+    fn _list_item(&mut self, selection: Vec<String>) {
         // self.activate_connection(selection);
 
         // if someone just hit enter on Connections do nothing
@@ -183,7 +183,7 @@ impl App {
     }
 
     fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action> {
-        let mut res = Action::Nothing;
+        let res = Action::Nothing;
         // handle event for components
         for component in self.components.iter_mut() {
             component.handle_mouse_event(mouse_event, self.focus)?;

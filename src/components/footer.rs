@@ -7,13 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::{
-    app::Focus,
-    config::{
-        cloud_config::{CloudProvider, GcsConfig},
-        Config,
-    },
-};
+use crate::{app::Focus, config::Config};
 
 use super::{results_pager::ResultsPager, Component};
 

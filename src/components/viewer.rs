@@ -42,7 +42,7 @@ impl Default for Viewer {
 }
 
 impl Viewer {
-    pub fn update(active_connection: &str) -> Self {
+    pub fn _update(active_connection: &str) -> Self {
         let tree = ETree::new(active_connection.to_string());
         let nodes = tree.nodes();
         let mut items = vec![];
@@ -240,10 +240,11 @@ impl Component for Viewer {
             }
         }
 
-        self.state.open(path);
-
         // remake tree widget
         self.items = self.make_items();
+
+        self.state.open(path.clone());
+        self.state.select(path);
 
         Ok(())
     }
