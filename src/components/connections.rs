@@ -4,11 +4,14 @@ use crossterm::event::MouseEventKind;
 use ego_tree::{NodeId, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::widgets::{Block, Clear, Scrollbar, ScrollbarOrientation};
+use ratatui::widgets::block::Block;
+use ratatui::widgets::{Borders, Clear, Scrollbar, ScrollbarOrientation};
+
 use ratatui::Frame;
 use std::io::Result;
 use std::process::Command;
 use std::vec;
+use tui_textarea::TextArea;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::action::Action;
@@ -25,6 +28,9 @@ pub struct Connections {
     pub items: Vec<TreeItem<'static, String>>,
     pub config: Config,
     pub results_pager: ResultsPager,
+    // pub connection_filter: ConnectionFilter,
+    pub filter_active: bool,
+    // pub filter: Vec<char>,
 }
 
 impl Default for Connections {
@@ -41,6 +47,7 @@ impl Connections {
             items: Vec::new(),
             config: Config::default(),
             results_pager: ResultsPager::default(),
+            filter_active: false,
         }
     }
 
@@ -156,6 +163,7 @@ impl Component for Connections {
                     self.state.scroll_up(1);
                     Ok(Some(Action::Nothing))
                 }
+
                 MouseEventKind::Down(_button) => {
                     self.state
                         .click_at(Position::new(mouse_event.column, mouse_event.row));
@@ -176,7 +184,7 @@ impl Component for Connections {
                 {
                     Ok(Some(Action::Quit))
                 } else if key == self.config.key_config.change_focus {
-                    Ok(Some(Action::ChangeFocus))
+                    Ok(Some(Action::ChangeFocus(Focus::Viewer)))
                 } else if [
                     self.config.key_config.key_up,
                     self.config.key_config.arrow_up,
@@ -254,6 +262,23 @@ impl Component for Connections {
                     } else {
                         Ok(Some(Action::Nothing))
                     }
+                } else if key == self.config.key_config.filter {
+                    // activate filter
+                    self.filter_active = !self.filter_active;
+                    Ok(Some(Action::ChangeFocus(Focus::ConnectionsFilter)))
+                } else {
+                    Ok(Some(Action::Nothing))
+                }
+            }
+            Focus::ConnectionsFilter => {
+                if [self.config.key_config.quit, self.config.key_config.exit]
+                    .iter()
+                    .any(|kc| kc == &key)
+                {
+                    Ok(Some(Action::Quit))
+                } else if key == self.config.key_config.filter {
+                    self.filter_active = !self.filter_active;
+                    Ok(Some(Action::ChangeFocus(Focus::Connections)))
                 } else {
                     Ok(Some(Action::Nothing))
                 }
@@ -269,6 +294,24 @@ impl Component for Connections {
 
         let [connections, _] =
             Layout::horizontal([Constraint::Percentage(15), Constraint::Min(1)]).areas(content);
+
+        let [filter, connections] = if self.filter_active {
+            Layout::vertical([Constraint::Percentage(10), Constraint::Percentage(90)])
+                .areas(connections)
+        } else {
+            [Rect::default(), connections]
+        };
+
+        let mut textarea = TextArea::default();
+        textarea.set_cursor_line_style(ratatui::style::Style::default());
+        textarea.set_placeholder_text("Enter a valid float (e.g. 1.56)");
+        textarea.set_style(Style::default().fg(Color::LightRed));
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Color::Blue)
+                .title("Connex Filter"),
+        );
 
         let widget = Tree::new(&self.items)
             .expect("all item identifieers are unique")
@@ -298,6 +341,8 @@ impl Component for Connections {
 
         frame.render_widget(Clear, connections);
         frame.render_stateful_widget(widget, connections, &mut self.state);
+        frame.render_widget(&textarea, filter);
+
         Ok(())
     }
 
@@ -306,87 +351,6 @@ impl Component for Connections {
         Ok(())
     }
 }
-
-// fn add_children(node: NodeRef<String>, tree_item: &mut TreeItem<String>, page_idx: usize) {
-//     if node.has_children() {
-//         let num_node_children = node.children().count();
-
-//         if num_node_children > 20 {
-//             let node_children_vec: Vec<NodeRef<String>> = node.children().collect();
-//             let node_children_pages: Vec<Vec<NodeRef<String>>> = node_children_vec
-//                 .chunks(20)
-//                 .map(|chunk| chunk.to_vec())
-//                 .collect();
-
-//             let num_pages = node_children_pages.len();
-
-//             let page_of_children = node_children_pages[page_idx].clone();
-
-//             page_of_children
-//                 .iter()
-//                 .enumerate()
-//                 .for_each(|(child_idx, n)| {
-//                     let child_val = n.value().to_string();
-//                     let split_text = child_val.split('/');
-
-//                     let clean_text = if split_text.clone().count() <= 4 {
-//                         child_val.clone()
-//                     } else if split_text.clone().last().unwrap() == "" {
-//                         split_text.rev().nth(1).unwrap().to_string() + "/"
-//                     } else {
-//                         split_text.last().unwrap().to_string()
-//                     };
-
-//                     let mut child_ti = TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
-//                         .expect("error creating child node");
-
-//                     add_children(*n, &mut child_ti, page_idx);
-//                     tree_item
-//                         .add_child(child_ti)
-//                         .expect("error adding child to the tree item");
-
-//                     // if not last page, add ... Press 'L' for next page ...
-//                     if page_idx + 1 < num_pages {
-//                         // not on last page yet
-//                         if child_idx + 1 == 20 {
-//                             // add delimiter
-
-//                             let next_page_text = "... Press 'L' for next page ...".to_string();
-//                             let delim_ti =
-//                                 TreeItem::new(next_page_text.clone(), next_page_text, vec![])
-//                                     .expect("error creating child node");
-
-//                             tree_item
-//                                 .add_child(delim_ti)
-//                                 .expect("error adding delimiter to the tree item");
-//                         }
-//                     } else {
-//                         {}
-//                     }
-//                 })
-//         } else {
-//             node.children().for_each(|n| {
-//                 let child_val = n.value().to_string();
-//                 let split_text = child_val.split('/');
-
-//                 let clean_text = if split_text.clone().count() <= 4 {
-//                     child_val.clone()
-//                 } else if split_text.clone().last().unwrap() == "" {
-//                     split_text.rev().nth(1).unwrap().to_string() + "/"
-//                 } else {
-//                     split_text.last().unwrap().to_string()
-//                 };
-
-//                 let mut child_ti = TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
-//                     .expect("error creating child node");
-//                 add_children(n, &mut child_ti, page_idx);
-//                 tree_item
-//                     .add_child(child_ti)
-//                     .expect("error adding child to the tree item");
-//             })
-//         }
-//     }
-// }
 
 fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
     Command::new(program)

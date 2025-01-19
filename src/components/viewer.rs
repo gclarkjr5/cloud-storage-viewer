@@ -202,7 +202,7 @@ impl Component for Viewer {
                 {
                     Ok(Some(Action::Quit))
                 } else if key == self.config.key_config.change_focus {
-                    Ok(Some(Action::ChangeFocus))
+                    Ok(Some(Action::ChangeFocus(Focus::Connections)))
                 } else if [
                     self.config.key_config.key_up,
                     self.config.key_config.arrow_up,

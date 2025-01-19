@@ -63,7 +63,9 @@ impl Component for Footer {
                     "List Items=".into(),
                     "[Enter] ".blue(),
                     "Activate Account=".into(),
-                    "[a]".blue(),
+                    "[a] ".blue(),
+                    "Open Filter=".into(),
+                    "[Ctrl+f]".blue(),
                 ];
                 Paragraph::new(Line::from(connection_commands)).block(
                     Block::default()
@@ -89,6 +91,15 @@ impl Component for Footer {
                     Block::default()
                         .borders(Borders::ALL)
                         .title("Viewer Commands")
+                        .style(Style::default()),
+                )
+            }
+            Focus::ConnectionsFilter => {
+                let filter_commands = vec!["Close Filter=".into(), "[Ctrl+f] ".blue()];
+                Paragraph::new(Line::from(filter_commands)).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Connection Commands")
                         .style(Style::default()),
                 )
             }

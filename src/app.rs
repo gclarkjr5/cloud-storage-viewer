@@ -17,6 +17,7 @@ use crate::tui::Tui;
 pub enum Focus {
     Connections,
     Viewer,
+    ConnectionsFilter,
 }
 
 #[must_use]
@@ -67,7 +68,7 @@ impl App {
             // after drawing, handle terminal events
             match self.handle_events()? {
                 Action::Quit => break,
-                Action::ChangeFocus => self.change_focus(),
+                Action::ChangeFocus(focus) => self.change_focus(focus),
                 Action::ListCloudProvider(cloud_config) => {
                     self.config.cloud_config = cloud_config;
                     for component in self.components.iter_mut() {
@@ -80,7 +81,7 @@ impl App {
                         component.register_config(self.config.clone())?;
                         component.list_items(buckets.clone(), selection.clone())?;
                     }
-                    self.change_focus()
+                    self.change_focus(Focus::Viewer)
                 }
                 Action::ActivateConfig(selection) => {
                     self.config.cloud_config.activate_config(selection)?;
@@ -176,11 +177,8 @@ impl App {
         Ok(res)
     }
 
-    pub fn change_focus(&mut self) {
-        match self.focus {
-            Focus::Connections => self.focus = Focus::Viewer,
-            Focus::Viewer => self.focus = Focus::Connections,
-        }
+    pub fn change_focus(&mut self, focus: Focus) {
+        self.focus = focus;
     }
 
     pub fn render(&mut self, tui: &mut Tui) -> Result<()> {

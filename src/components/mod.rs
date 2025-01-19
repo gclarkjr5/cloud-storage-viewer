@@ -4,6 +4,7 @@ use crate::{action::Action, app::Focus, config::Config, key::Key};
 use crossterm::event::MouseEvent;
 use ratatui::{layout::Rect, Frame};
 
+pub mod connection_filter;
 pub mod connections;
 pub mod footer;
 pub mod results_pager;
