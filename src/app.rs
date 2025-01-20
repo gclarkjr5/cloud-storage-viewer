@@ -6,6 +6,7 @@ use crossterm::event::{Event, KeyEvent, MouseEvent};
 use super::components::connections::Connections;
 use super::components::viewer::Viewer;
 use crate::action::Action;
+use crate::components::connection_filter::ConnectionFilter;
 use crate::components::footer::Footer;
 use crate::components::Component as Comp;
 use crate::config::cloud_config::CloudProvider;
@@ -55,8 +56,6 @@ impl App {
         self.config.init()?;
         for component in self.components.iter_mut() {
             component.register_config(self.config.clone())?;
-        }
-        for component in self.components.iter_mut() {
             component.init()?;
         }
 
@@ -108,31 +107,6 @@ impl App {
 
         tui.exit()?;
         Ok(())
-    }
-
-    fn _list_item(&mut self, selection: Vec<String>) {
-        // if someone just hit enter on Connections do nothing
-        let final_node = selection.last().unwrap().as_str();
-        if matches!(final_node, "Connections") {
-            return;
-        }
-
-        // get second node, if its a cloud, set active cloud and list items
-        let second_node = selection.get(1).unwrap().clone().into();
-        match second_node {
-            CloudProvider::Azure(config) => self
-                .config
-                .cloud_config
-                .set_active_cloud(CloudProvider::Azure(config)),
-            CloudProvider::Gcs(config) => self
-                .config
-                .cloud_config
-                .set_active_cloud(CloudProvider::Gcs(config)),
-            CloudProvider::S3(config) => self
-                .config
-                .cloud_config
-                .set_active_cloud(CloudProvider::S3(config)),
-        }
     }
 
     fn handle_events(&mut self) -> Result<Action> {

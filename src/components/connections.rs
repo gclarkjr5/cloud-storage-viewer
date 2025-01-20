@@ -1,3 +1,4 @@
+use super::connection_filter::ConnectionFilter;
 use super::results_pager::ResultsPager;
 use super::Component;
 use crossterm::event::MouseEventKind;
@@ -5,13 +6,12 @@ use ego_tree::{NodeId, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::widgets::block::Block;
-use ratatui::widgets::{Borders, Clear, Scrollbar, ScrollbarOrientation};
+use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 
 use ratatui::Frame;
 use std::io::Result;
 use std::process::Command;
 use std::vec;
-use tui_textarea::TextArea;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::action::Action;
@@ -21,6 +21,49 @@ use crate::config::Config;
 use crate::key::Key;
 use crate::util;
 
+// pub struct AppConnections {
+//     // pub state: TreeState<String>,
+//     // pub tree: ETree<String>,
+//     // pub items: Vec<TreeItem<'static, String>>,
+//     pub config: Config,
+//     // pub results_pager: ResultsPager,
+//     // pub connection_filter: ConnectionFilter,
+//     pub components: Vec<Box<dyn Component>>,
+// }
+
+// impl Default for AppConnections {
+//     fn default() -> Self {
+//         Self {
+//             config: Config::default(),
+//             components: vec![
+//                 Box::new(Connections::default()),
+//                 // Box::new(ConnectionFilter::default()),
+//             ],
+//         }
+//     }
+// }
+
+// impl Component for AppConnections {
+//     fn init(&mut self) -> Result<()> {
+//         for component in self.components.iter_mut() {
+//             component.init()?
+//         }
+//         Ok(())
+//     }
+//     fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<()> {
+//         for component in self.components.iter_mut() {
+//             component.draw(frame, area, focus)?
+//         }
+//         Ok(())
+//     }
+//     fn register_config(&mut self, config: Config) -> Result<()> {
+//         for component in self.components.iter_mut() {
+//             component.register_config(config.clone())?
+//         }
+//         Ok(())
+//     }
+// }
+
 #[derive(Debug)]
 pub struct Connections {
     pub state: TreeState<String>,
@@ -28,9 +71,7 @@ pub struct Connections {
     pub items: Vec<TreeItem<'static, String>>,
     pub config: Config,
     pub results_pager: ResultsPager,
-    // pub connection_filter: ConnectionFilter,
-    pub filter_active: bool,
-    // pub filter: Vec<char>,
+    pub connection_filter: ConnectionFilter,
 }
 
 impl Default for Connections {
@@ -47,7 +88,7 @@ impl Connections {
             items: Vec::new(),
             config: Config::default(),
             results_pager: ResultsPager::default(),
-            filter_active: false,
+            connection_filter: ConnectionFilter::default(),
         }
     }
 
@@ -144,6 +185,8 @@ impl Component for Connections {
 
         self.tree = tree;
         self.items = items;
+
+        self.connection_filter.init()?;
 
         Ok(())
     }
@@ -264,26 +307,14 @@ impl Component for Connections {
                     }
                 } else if key == self.config.key_config.filter {
                     // activate filter
-                    self.filter_active = !self.filter_active;
+                    self.connection_filter.active = !self.connection_filter.active;
                     Ok(Some(Action::ChangeFocus(Focus::ConnectionsFilter)))
                 } else {
                     Ok(Some(Action::Nothing))
                 }
             }
-            Focus::ConnectionsFilter => {
-                if [self.config.key_config.quit, self.config.key_config.exit]
-                    .iter()
-                    .any(|kc| kc == &key)
-                {
-                    Ok(Some(Action::Quit))
-                } else if key == self.config.key_config.filter {
-                    self.filter_active = !self.filter_active;
-                    Ok(Some(Action::ChangeFocus(Focus::Connections)))
-                } else {
-                    Ok(Some(Action::Nothing))
-                }
-            }
-            _ => Ok(Some(Action::Nothing)),
+            Focus::ConnectionsFilter => self.connection_filter.handle_key_event(key, focus),
+            _ => Ok(None),
         }
     }
 
@@ -295,23 +326,23 @@ impl Component for Connections {
         let [connections, _] =
             Layout::horizontal([Constraint::Percentage(15), Constraint::Min(1)]).areas(content);
 
-        let [filter, connections] = if self.filter_active {
+        let [_, connections] = if self.connection_filter.active {
             Layout::vertical([Constraint::Percentage(10), Constraint::Percentage(90)])
                 .areas(connections)
         } else {
             [Rect::default(), connections]
         };
 
-        let mut textarea = TextArea::default();
-        textarea.set_cursor_line_style(ratatui::style::Style::default());
-        textarea.set_placeholder_text("Enter a valid float (e.g. 1.56)");
-        textarea.set_style(Style::default().fg(Color::LightRed));
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Color::Blue)
-                .title("Connex Filter"),
-        );
+        // let mut textarea = TextArea::default();
+        // textarea.set_cursor_line_style(ratatui::style::Style::default());
+        // textarea.set_placeholder_text("Enter a valid float (e.g. 1.56)");
+        // textarea.set_style(Style::default().fg(Color::LightRed));
+        // textarea.set_block(
+        //     Block::default()
+        //         .borders(Borders::ALL)
+        //         .border_style(Color::Blue)
+        //         .title("Connex Filter"),
+        // );
 
         let widget = Tree::new(&self.items)
             .expect("all item identifieers are unique")
@@ -341,13 +372,21 @@ impl Component for Connections {
 
         frame.render_widget(Clear, connections);
         frame.render_stateful_widget(widget, connections, &mut self.state);
-        frame.render_widget(&textarea, filter);
+        self.connection_filter.draw(frame, area, focus)?;
+        // if matches!(focus, Focus::ConnectionsFilter) {
+        //     self.connection_filter.draw(frame, area, focus)?;
+        //     self.connection_filter
+        //         .register_config(self.config.clone())?;
+        //     self.connection_filter.init()?;
+        // }
 
         Ok(())
     }
 
     fn register_config(&mut self, config: Config) -> Result<()> {
         self.config = config;
+        self.connection_filter
+            .register_config(self.config.clone())?;
         Ok(())
     }
 }
