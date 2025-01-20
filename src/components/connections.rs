@@ -333,17 +333,6 @@ impl Component for Connections {
             [Rect::default(), connections]
         };
 
-        // let mut textarea = TextArea::default();
-        // textarea.set_cursor_line_style(ratatui::style::Style::default());
-        // textarea.set_placeholder_text("Enter a valid float (e.g. 1.56)");
-        // textarea.set_style(Style::default().fg(Color::LightRed));
-        // textarea.set_block(
-        //     Block::default()
-        //         .borders(Borders::ALL)
-        //         .border_style(Color::Blue)
-        //         .title("Connex Filter"),
-        // );
-
         let widget = Tree::new(&self.items)
             .expect("all item identifieers are unique")
             .block(
@@ -373,12 +362,6 @@ impl Component for Connections {
         frame.render_widget(Clear, connections);
         frame.render_stateful_widget(widget, connections, &mut self.state);
         self.connection_filter.draw(frame, area, focus)?;
-        // if matches!(focus, Focus::ConnectionsFilter) {
-        //     self.connection_filter.draw(frame, area, focus)?;
-        //     self.connection_filter
-        //         .register_config(self.config.clone())?;
-        //     self.connection_filter.init()?;
-        // }
 
         Ok(())
     }

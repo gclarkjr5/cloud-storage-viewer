@@ -31,9 +31,6 @@ impl Component for ConnectionFilter {
         let [filter, _] =
             Layout::vertical([Constraint::Percentage(10), Constraint::Percentage(90)])
                 .areas(connections);
-        // } else {
-        //     [Rect::default(), connections]
-        // };
 
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(ratatui::style::Style::default());
@@ -48,8 +45,8 @@ impl Component for ConnectionFilter {
                     Style::default()
                 }),
         );
-        // frame.render_widget(Clear, filter);
         if self.active {
+            frame.render_widget(Clear, filter);
             frame.render_widget(&textarea, filter);
         }
         Ok(())
