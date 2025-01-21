@@ -6,12 +6,9 @@ use crossterm::event::{Event, KeyEvent, MouseEvent};
 use super::components::connections::Connections;
 use super::components::viewer::Viewer;
 use crate::action::Action;
-use crate::components::connection_filter::ConnectionFilter;
 use crate::components::footer::Footer;
 use crate::components::Component as Comp;
-use crate::config::cloud_config::CloudProvider;
 use crate::config::Config;
-use crate::key::Key;
 use crate::tui::Tui;
 
 #[derive(Debug, Clone, Copy)]
@@ -19,6 +16,7 @@ pub enum Focus {
     Connections,
     Viewer,
     ConnectionsFilter,
+    ConnectionFilterResults,
 }
 
 #[must_use]
@@ -55,7 +53,7 @@ impl App {
         // }
         self.config.init()?;
         for component in self.components.iter_mut() {
-            component.register_config(self.config.clone())?;
+            component.register_config(self.config.clone(), self.focus)?;
             component.init()?;
         }
 
@@ -71,24 +69,31 @@ impl App {
                 Action::ListCloudProvider(cloud_config) => {
                     self.config.cloud_config = cloud_config;
                     for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone())?;
+                        component.register_config(self.config.clone(), self.focus)?;
                     }
                 }
                 Action::ListConfiguration(cloud_config, selection, buckets) => {
                     self.config.cloud_config = cloud_config;
+                    self.change_focus(Focus::Viewer);
                     for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone())?;
-                        component.list_items(buckets.clone(), selection.clone())?;
+                        component.register_config(self.config.clone(), self.focus)?;
+                        component.list_items(buckets.clone(), selection.clone(), self.focus)?;
                     }
-                    self.change_focus(Focus::Viewer)
                 }
                 Action::ActivateConfig(selection) => {
                     self.config.cloud_config.activate_config(selection)?;
                     for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone())?;
+                        component.register_config(self.config.clone(), self.focus)?;
+                    }
+                }
+                Action::SelectFilteredItem(item) => {
+                    self.change_focus(Focus::Connections);
+                    for component in self.components.iter_mut() {
+                        component.select_item(&item)?;
                     }
                 }
                 Action::Nothing => (),
+                Action::Filter(_) => (),
             };
             // if self
             //     .handle_events()
@@ -124,12 +129,12 @@ impl App {
 
     fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action> {
         // convert key event into Key
-        let key: Key = key_event.into();
+        // let key: Key = key_event.into();
 
         let mut res = Action::Nothing;
         // handle event for components
         for component in self.components.iter_mut() {
-            let act = component.handle_key_event(key, self.focus)?;
+            let act = component.handle_key_event(key_event, self.focus)?;
             if act
                 .clone()
                 .is_some_and(|a| matches!(a, Action::ActivateConfig(_selection)))

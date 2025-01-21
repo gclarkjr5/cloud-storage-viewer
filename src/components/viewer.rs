@@ -1,6 +1,6 @@
 use std::{io::BufRead, io::Result, process::Command};
 
-use crossterm::event::MouseEventKind;
+use crossterm::event::{KeyEvent, MouseEventKind};
 use ego_tree::{NodeId, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -43,31 +43,31 @@ impl Default for Viewer {
 }
 
 impl Viewer {
-    pub fn _update(active_connection: &str) -> Self {
-        let tree = ETree::new(active_connection.to_string());
-        let nodes = tree.nodes();
-        let mut items = vec![];
-        let results_pager = ResultsPager::default();
+    // pub fn _update(active_connection: &str) -> Self {
+    //     let tree = ETree::new(active_connection.to_string());
+    //     let nodes = tree.nodes();
+    //     let mut items = vec![];
+    //     let results_pager = ResultsPager::default();
 
-        nodes
-            .filter(|node| node.parent().is_none())
-            .for_each(|node| {
-                let val = node.value().to_string();
-                let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
-                    .expect("error creating nodes under parent");
+    //     nodes
+    //         .filter(|node| node.parent().is_none())
+    //         .for_each(|node| {
+    //             let val = node.value().to_string();
+    //             let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
+    //                 .expect("error creating nodes under parent");
 
-                util::add_children(node, &mut ti, &mut results_pager.clone());
-                items.push(ti);
-            });
+    //             util::add_children(node, &mut ti, &mut results_pager.clone(), Focus::Connections);
+    //             items.push(ti);
+    //         });
 
-        Self {
-            config: Config::default(),
-            state: TreeState::default(),
-            tree: ETree::new(active_connection.to_string()),
-            items: Vec::new(),
-            results_pager: ResultsPager::default(),
-        }
-    }
+    //     Self {
+    //         config: Config::default(),
+    //         state: TreeState::default(),
+    //         tree: ETree::new(active_connection.to_string()),
+    //         items: Vec::new(),
+    //         results_pager: ResultsPager::default(),
+    //     }
+    // }
 
     pub fn increase_results_page(&mut self) -> Option<()> {
         // only increase page idx if we are on a page less than the number of pages
@@ -116,7 +116,7 @@ pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
 }
 
 impl Component for Viewer {
-    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>) -> Result<()> {
+    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<()> {
         // find node, verify, unwrap, and set pager
         let found_node = self.find_node_to_append(path.clone());
 
@@ -158,7 +158,7 @@ impl Component for Viewer {
         }
 
         // remake tree widget
-        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager);
+        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
 
         self.state.open(path.clone());
         self.state.select(path);
@@ -166,7 +166,7 @@ impl Component for Viewer {
         Ok(())
     }
 
-    fn register_config(&mut self, config: Config) -> Result<()> {
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<()> {
         self.config = config;
 
         let active_config = format!("{}", self.config.cloud_config);
@@ -183,7 +183,7 @@ impl Component for Viewer {
                 let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
                     .expect("error creating nodes under parent");
 
-                util::add_children(node, &mut ti, &mut results_pager.clone());
+                util::add_children(node, &mut ti, &mut results_pager.clone(), focus);
                 items.push(ti);
             });
 
@@ -193,7 +193,8 @@ impl Component for Viewer {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key: Key, focus: Focus) -> Result<Option<Action>> {
+    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Option<Action>> {
+        let key: Key = key_event.into();
         match focus {
             Focus::Viewer => {
                 if [self.config.key_config.quit, self.config.key_config.exit]
@@ -251,16 +252,18 @@ impl Component for Viewer {
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
                     let data = cli_command("gsutil", vec!["ls", selected.last().unwrap()]);
-                    self.list_items(data, selected)?;
+                    self.list_items(data, selected, focus)?;
                     Ok(None)
                 } else if key == self.config.key_config.next_page {
                     self.increase_results_page();
-                    self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager);
+                    self.items =
+                        util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
                     self.state.select(self.results_pager.paged_item.clone());
                     Ok(Some(Action::Nothing))
                 } else if key == self.config.key_config.previous_page {
                     self.decrease_results_page();
-                    self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager);
+                    self.items =
+                        util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
                     self.state.select(self.results_pager.paged_item.clone());
                     Ok(Some(Action::Nothing))
                 } else {

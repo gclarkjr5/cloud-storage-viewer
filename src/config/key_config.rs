@@ -24,6 +24,9 @@ pub struct KeyConfig {
     // pub page_down: Key,
     // pub page_up: Key,
     pub list_item: Key,
+    pub enter: Key,
+    pub backspace: Key,
+    pub delete: Key,
 }
 
 impl Default for KeyConfig {
@@ -50,7 +53,10 @@ impl Default for KeyConfig {
             // page_down: Key::Ctrl('f'),
             // page_up: Key::Ctrl('b'),
             list_item: Key::Enter,
+            enter: Key::Enter,
             change_focus: Key::Tab,
+            backspace: Key::Backspace,
+            delete: Key::Delete,
         }
     }
 }

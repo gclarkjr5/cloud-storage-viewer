@@ -1,22 +1,23 @@
 use ego_tree::{iter::Nodes, NodeRef};
 use tui_tree_widget::TreeItem;
 
-use crate::components::results_pager::ResultsPager;
+use crate::{app::Focus, components::results_pager::ResultsPager};
 
 pub fn make_tree_items(
     nodes: Nodes<String>,
     results_pager: &mut ResultsPager,
+    focus: Focus,
 ) -> Vec<TreeItem<'static, String>> {
     let mut root_vec = vec![];
 
     nodes
         .filter(|node| node.parent().is_none())
         .for_each(|node| {
-            let val = node.value().to_string();
-            let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
+            let identifier = node.value().to_string();
+            let mut ti = TreeItem::new(identifier.clone(), identifier.clone(), vec![])
                 .expect("error creating nodes under parent");
 
-            add_children(node, &mut ti, &mut results_pager.clone());
+            add_children(node, &mut ti, &mut results_pager.clone(), focus);
             root_vec.push(ti);
         });
 
@@ -27,6 +28,7 @@ pub fn add_children(
     node: NodeRef<String>,
     tree_item: &mut TreeItem<String>,
     results_pager: &mut ResultsPager,
+    focus: Focus,
 ) {
     if node.has_children() {
         let num_node_children = node.children().count();
@@ -56,19 +58,24 @@ pub fn add_children(
                         // prettify child text
                         let child_val = n.value().to_string();
                         let split_text = child_val.split('/');
-                        let clean_text = if split_text.clone().count() <= 4 {
-                            child_val.clone()
-                        } else if split_text.clone().last().unwrap() == "" {
-                            split_text.rev().nth(1).unwrap().to_string() + "/"
-                        } else {
-                            split_text.last().unwrap().to_string()
+                        let clean_text = match focus {
+                            Focus::Connections => split_text.last().unwrap().to_string(),
+                            _ => {
+                                if split_text.clone().count() <= 4 {
+                                    child_val.clone()
+                                } else if split_text.clone().last().unwrap() == "" {
+                                    split_text.rev().nth(1).unwrap().to_string() + "/"
+                                } else {
+                                    split_text.last().unwrap().to_string()
+                                }
+                            }
                         };
 
                         let mut child_ti =
                             TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
                                 .expect("error creating child node");
 
-                        add_children(*n, &mut child_ti, &mut results_pager.clone());
+                        add_children(*n, &mut child_ti, &mut results_pager.clone(), focus);
                         tree_item
                             .add_child(child_ti)
                             .expect("error adding child to the tree item");
@@ -76,20 +83,25 @@ pub fn add_children(
             }
         } else {
             node.children().for_each(|n| {
+                // println!("got child: {:?}", n.value());
                 let child_val = n.value().to_string();
                 let split_text = child_val.split('/');
-
-                let clean_text = if split_text.clone().count() <= 4 {
-                    child_val.clone()
-                } else if split_text.clone().last().unwrap() == "" {
-                    split_text.rev().nth(1).unwrap().to_string() + "/"
-                } else {
-                    split_text.last().unwrap().to_string()
+                let clean_text = match focus {
+                    Focus::Connections => split_text.last().unwrap().to_string(),
+                    _ => {
+                        if split_text.clone().count() <= 4 {
+                            child_val.clone()
+                        } else if split_text.clone().last().unwrap() == "" {
+                            split_text.rev().nth(1).unwrap().to_string() + "/"
+                        } else {
+                            split_text.last().unwrap().to_string()
+                        }
+                    }
                 };
 
                 let mut child_ti = TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
                     .expect("error creating child node");
-                add_children(n, &mut child_ti, &mut results_pager.clone());
+                add_children(n, &mut child_ti, &mut results_pager.clone(), focus);
                 tree_item
                     .add_child(child_ti)
                     .expect("error adding child to the tree item");

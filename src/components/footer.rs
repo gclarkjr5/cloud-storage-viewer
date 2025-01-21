@@ -18,12 +18,12 @@ pub struct Footer {
 }
 
 impl Component for Footer {
-    fn register_config(&mut self, config: Config) -> Result<()> {
+    fn register_config(&mut self, config: Config, _focus: Focus) -> Result<()> {
         self.config = config;
         Ok(())
     }
 
-    fn list_items(&mut self, data: Vec<u8>, _path: Vec<String>) -> Result<()> {
+    fn list_items(&mut self, data: Vec<u8>, _path: Vec<String>, _focus: Focus) -> Result<()> {
         self.results_pager.init(&data, Vec::new());
         Ok(())
     }
@@ -95,7 +95,30 @@ impl Component for Footer {
                 )
             }
             Focus::ConnectionsFilter => {
-                let filter_commands = vec!["Close Filter=".into(), "[Ctrl+f] ".blue()];
+                let filter_commands = vec![
+                    "Switch to Results=".into(),
+                    "[Enter/Tab] ".blue(),
+                    "Close Filter=".into(),
+                    "[Ctrl+f] ".blue(),
+                ];
+                Paragraph::new(Line::from(filter_commands)).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Connection Commands")
+                        .style(Style::default()),
+                )
+            }
+            Focus::ConnectionFilterResults => {
+                let filter_commands = vec![
+                    "Up=".into(),
+                    "[k/Up Arrow] ".blue(),
+                    "Down=".into(),
+                    "[j/Down Arrow] ".blue(),
+                    "Switch to Filter=".into(),
+                    "[Tab] ".blue(),
+                    "Select Result=".into(),
+                    "[Enter] ".blue(),
+                ];
                 Paragraph::new(Line::from(filter_commands)).block(
                     Block::default()
                         .borders(Borders::ALL)

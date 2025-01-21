@@ -66,7 +66,12 @@ impl CloudConfig {
     pub fn activate_config(&mut self, path_identifier: Vec<String>) -> Result<()> {
         // get the cloud in the path identifer as well as possible new connection
         let cloud_provider = path_identifier[1].clone().into();
-        let new_config = path_identifier[2].clone();
+        let new_config = path_identifier[2]
+            .clone()
+            .split('/')
+            .last()
+            .unwrap()
+            .to_string();
 
         self.cloud_providers
             .iter()

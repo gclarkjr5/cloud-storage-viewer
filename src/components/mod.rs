@@ -1,10 +1,11 @@
 use std::io::Result;
 
 use crate::{action::Action, app::Focus, config::Config, key::Key};
-use crossterm::event::MouseEvent;
+use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{layout::Rect, Frame};
 
 pub mod connection_filter;
+pub mod connection_filter_results;
 pub mod connections;
 pub mod footer;
 pub mod results_pager;
@@ -16,18 +17,9 @@ pub trait Component {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<()>;
-    // fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
-    //     let action = match event {
-    //         Some(Event::Key(key_event)) => self.handle_key_event(key_event)?,
-    //         Some(Event::Mouse(mouse_event)) => self.handle_mouse_event(mouse_event)?,
-    //         _ => None,
-    //     };
 
-    //     Ok(action)
-    // }
-
-    fn handle_key_event(&mut self, key: Key, focus: Focus) -> Result<Option<Action>> {
-        let _key = key;
+    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Option<Action>> {
+        let _key_event = key_event;
         let _foucs = focus;
         Ok(None)
     }
@@ -40,11 +32,16 @@ pub trait Component {
         let _foucs = focus;
         Ok(None)
     }
-    fn register_config(&mut self, config: Config) -> Result<()>;
-    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>) -> Result<()> {
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<()>;
+    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<()> {
         let _data = data;
         let _path = path;
+        let _focus = focus;
         Ok(())
     }
     // fn handle_mouse_event(&mut self, mouse_event: MouseEvent) -> Result<Option<Action>>;
+    fn select_item(&mut self, item: &str) -> Result<()> {
+        let _item = item;
+        Ok(())
+    }
 }

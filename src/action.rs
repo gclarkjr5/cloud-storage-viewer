@@ -5,8 +5,9 @@ pub enum Action {
     Quit,
     ListConfiguration(CloudConfig, Vec<String>, Vec<u8>),
     ListCloudProvider(CloudConfig),
-    // Filter(String)
+    Filter(Vec<String>),
     ChangeFocus(Focus),
     Nothing,
     ActivateConfig(Vec<String>),
+    SelectFilteredItem(String),
 }

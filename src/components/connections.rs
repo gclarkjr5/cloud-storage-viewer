@@ -1,7 +1,7 @@
 use super::connection_filter::ConnectionFilter;
 use super::results_pager::ResultsPager;
 use super::Component;
-use crossterm::event::MouseEventKind;
+use crossterm::event::{KeyEvent, MouseEventKind};
 use ego_tree::{NodeId, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -20,49 +20,6 @@ use crate::config::cloud_config::CloudProvider;
 use crate::config::Config;
 use crate::key::Key;
 use crate::util;
-
-// pub struct AppConnections {
-//     // pub state: TreeState<String>,
-//     // pub tree: ETree<String>,
-//     // pub items: Vec<TreeItem<'static, String>>,
-//     pub config: Config,
-//     // pub results_pager: ResultsPager,
-//     // pub connection_filter: ConnectionFilter,
-//     pub components: Vec<Box<dyn Component>>,
-// }
-
-// impl Default for AppConnections {
-//     fn default() -> Self {
-//         Self {
-//             config: Config::default(),
-//             components: vec![
-//                 Box::new(Connections::default()),
-//                 // Box::new(ConnectionFilter::default()),
-//             ],
-//         }
-//     }
-// }
-
-// impl Component for AppConnections {
-//     fn init(&mut self) -> Result<()> {
-//         for component in self.components.iter_mut() {
-//             component.init()?
-//         }
-//         Ok(())
-//     }
-//     fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<()> {
-//         for component in self.components.iter_mut() {
-//             component.draw(frame, area, focus)?
-//         }
-//         Ok(())
-//     }
-//     fn register_config(&mut self, config: Config) -> Result<()> {
-//         for component in self.components.iter_mut() {
-//             component.register_config(config.clone())?
-//         }
-//         Ok(())
-//     }
-// }
 
 #[derive(Debug)]
 pub struct Connections {
@@ -92,7 +49,7 @@ impl Connections {
         }
     }
 
-    pub fn list_cloud_provider(&mut self, selection: Vec<String>) -> Result<()> {
+    pub fn list_cloud_provider(&mut self, selection: Vec<String>, focus: Focus) -> Result<()> {
         let cloud_provider: CloudProvider = selection[1].clone().into();
         // find the node to append to
         let found_node = self.find_node_to_append(cloud_provider.clone().into());
@@ -111,7 +68,7 @@ impl Connections {
                 (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
                 (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
                     configs.iter().for_each(|config| {
-                        let res = config.name.clone();
+                        let res = format!("{}/{}", cp, config.name.clone());
 
                         self.tree
                             .get_mut(node_to_append_to)
@@ -124,7 +81,7 @@ impl Connections {
             });
 
         // convert tree into tree widget items
-        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager);
+        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
         self.state.open(selection);
         Ok(())
     }
@@ -179,7 +136,7 @@ impl Component for Connections {
 
                 let mut results_pager = self.results_pager.clone();
 
-                util::add_children(node, &mut ti, &mut results_pager);
+                util::add_children(node, &mut ti, &mut results_pager, Focus::Connections);
                 items.push(ti);
             });
 
@@ -218,7 +175,8 @@ impl Component for Connections {
         }
     }
 
-    fn handle_key_event(&mut self, key: Key, focus: Focus) -> Result<Option<Action>> {
+    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Option<Action>> {
+        let key: Key = key_event.into();
         match focus {
             Focus::Connections => {
                 if [self.config.key_config.quit, self.config.key_config.exit]
@@ -290,7 +248,7 @@ impl Component for Connections {
 
                         let cloud_provider: CloudProvider = selected[1].clone().into();
                         self.config.cloud_config.list_config(cloud_provider.clone());
-                        self.list_cloud_provider(selected)?;
+                        self.list_cloud_provider(selected, focus)?;
                         Ok(Some(Action::ListCloudProvider(
                             self.config.cloud_config.clone(),
                         )))
@@ -313,7 +271,35 @@ impl Component for Connections {
                     Ok(Some(Action::Nothing))
                 }
             }
-            Focus::ConnectionsFilter => self.connection_filter.handle_key_event(key, focus),
+            Focus::ConnectionsFilter => {
+                let text = self.connection_filter.handle_key_event(key_event, focus)?;
+                match text {
+                    None => Ok(Some(Action::Nothing)),
+                    Some(action) => match action {
+                        Action::Filter(txt) => {
+                            let t = txt.last().unwrap();
+                            self.connection_filter.filtered_results.items = self
+                                .tree
+                                .nodes()
+                                .filter(|n| n.value().contains(t))
+                                .map(|n| n.value().clone())
+                                .collect();
+                            self.connection_filter.filtered_results.results = self
+                                .connection_filter
+                                .filtered_results
+                                .results
+                                .clone()
+                                .items(self.connection_filter.filtered_results.items.clone());
+                            Ok(None)
+                        }
+                        _ => Ok(Some(action)),
+                    },
+                }
+            }
+            Focus::ConnectionFilterResults => self
+                .connection_filter
+                .filtered_results
+                .handle_key_event(key_event, focus),
             _ => Ok(None),
         }
     }
@@ -323,15 +309,8 @@ impl Component for Connections {
         let [content, _] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
 
-        let [connections, _] =
+        let [connections, _viewer] =
             Layout::horizontal([Constraint::Percentage(15), Constraint::Min(1)]).areas(content);
-
-        let [_, connections] = if self.connection_filter.active {
-            Layout::vertical([Constraint::Percentage(10), Constraint::Percentage(90)])
-                .areas(connections)
-        } else {
-            [Rect::default(), connections]
-        };
 
         let widget = Tree::new(&self.items)
             .expect("all item identifieers are unique")
@@ -361,15 +340,26 @@ impl Component for Connections {
 
         frame.render_widget(Clear, connections);
         frame.render_stateful_widget(widget, connections, &mut self.state);
-        self.connection_filter.draw(frame, area, focus)?;
+        self.connection_filter.draw(frame, connections, focus)?;
 
         Ok(())
     }
 
-    fn register_config(&mut self, config: Config) -> Result<()> {
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<()> {
         self.config = config;
         self.connection_filter
-            .register_config(self.config.clone())?;
+            .register_config(self.config.clone(), focus)?;
+        Ok(())
+    }
+    fn select_item(&mut self, item: &str) -> Result<()> {
+        let mut selection = vec!["Connections".to_string()];
+
+        self.connection_filter.active = !self.connection_filter.active;
+        let path = item.split('/').nth(0).unwrap().to_string();
+        selection.push(path);
+        selection.push(item.to_string());
+
+        self.state.select(selection);
         Ok(())
     }
 }
