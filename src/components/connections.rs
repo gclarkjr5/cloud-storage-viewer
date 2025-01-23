@@ -28,7 +28,7 @@ pub struct Connections {
     pub items: Vec<TreeItem<'static, String>>,
     pub config: Config,
     pub results_pager: ResultsPager,
-    pub connection_filter: ConnectionFilter,
+    pub filter: ConnectionFilter,
 }
 
 impl Default for Connections {
@@ -45,7 +45,7 @@ impl Connections {
             items: Vec::new(),
             config: Config::default(),
             results_pager: ResultsPager::default(),
-            connection_filter: ConnectionFilter::default(),
+            filter: ConnectionFilter::default(),
         }
     }
 
@@ -143,7 +143,7 @@ impl Component for Connections {
         self.tree = tree;
         self.items = items;
 
-        self.connection_filter.init()?;
+        self.filter.init()?;
 
         Ok(())
     }
@@ -265,31 +265,32 @@ impl Component for Connections {
                     }
                 } else if key == self.config.key_config.filter {
                     // activate filter
-                    self.connection_filter.active = !self.connection_filter.active;
+                    self.filter.active = !self.filter.active;
                     Ok(Some(Action::ChangeFocus(Focus::ConnectionsFilter)))
                 } else {
                     Ok(Some(Action::Nothing))
                 }
             }
             Focus::ConnectionsFilter => {
-                let text = self.connection_filter.handle_key_event(key_event, focus)?;
-                match text {
+                let action = self.filter.handle_key_event(key_event, focus)?;
+                match action {
                     None => Ok(Some(Action::Nothing)),
                     Some(action) => match action {
                         Action::Filter(txt) => {
                             let t = txt.last().unwrap();
-                            self.connection_filter.filtered_results.items = self
+                            self.filter.filtered_results.items = self
                                 .tree
                                 .nodes()
-                                .filter(|n| n.value().contains(t))
+                                .filter(|n| n.value().contains(t) && n.value().contains("/"))
                                 .map(|n| n.value().clone())
                                 .collect();
-                            self.connection_filter.filtered_results.results = self
-                                .connection_filter
+                            // }
+                            self.filter.filtered_results.results = self
+                                .filter
                                 .filtered_results
                                 .results
                                 .clone()
-                                .items(self.connection_filter.filtered_results.items.clone());
+                                .items(self.filter.filtered_results.items.clone());
                             Ok(None)
                         }
                         _ => Ok(Some(action)),
@@ -297,7 +298,7 @@ impl Component for Connections {
                 }
             }
             Focus::ConnectionFilterResults => self
-                .connection_filter
+                .filter
                 .filtered_results
                 .handle_key_event(key_event, focus),
             _ => Ok(None),
@@ -340,26 +341,27 @@ impl Component for Connections {
 
         frame.render_widget(Clear, connections);
         frame.render_stateful_widget(widget, connections, &mut self.state);
-        self.connection_filter.draw(frame, connections, focus)?;
+        self.filter.draw(frame, connections, focus)?;
 
         Ok(())
     }
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<()> {
         self.config = config;
-        self.connection_filter
-            .register_config(self.config.clone(), focus)?;
+        self.filter.register_config(self.config.clone(), focus)?;
         Ok(())
     }
-    fn select_item(&mut self, item: &str) -> Result<()> {
-        let mut selection = vec!["Connections".to_string()];
+    fn select_item(&mut self, item: &str, focus: Focus) -> Result<()> {
+        if matches!(focus, Focus::Connections) {
+            let mut selection = vec!["Connections".to_string()];
 
-        self.connection_filter.active = !self.connection_filter.active;
-        let path = item.split('/').nth(0).unwrap().to_string();
-        selection.push(path);
-        selection.push(item.to_string());
+            self.filter.active = !self.filter.active;
+            let path = item.split('/').nth(0).unwrap().to_string();
+            selection.push(path);
+            selection.push(item.to_string());
 
-        self.state.select(selection);
+            self.state.select(selection);
+        }
         Ok(())
     }
 }

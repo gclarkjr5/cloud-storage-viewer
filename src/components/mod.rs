@@ -1,6 +1,6 @@
 use std::io::Result;
 
-use crate::{action::Action, app::Focus, config::Config, key::Key};
+use crate::{action::Action, app::Focus, config::Config};
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{layout::Rect, Frame};
 
@@ -10,6 +10,8 @@ pub mod connections;
 pub mod footer;
 pub mod results_pager;
 pub mod viewer;
+pub mod viewer_filter;
+pub mod viewer_filter_results;
 
 pub trait Component {
     fn init(&mut self) -> Result<()> {
@@ -40,8 +42,9 @@ pub trait Component {
         Ok(())
     }
     // fn handle_mouse_event(&mut self, mouse_event: MouseEvent) -> Result<Option<Action>>;
-    fn select_item(&mut self, item: &str) -> Result<()> {
+    fn select_item(&mut self, item: &str, focus: Focus) -> Result<()> {
         let _item = item;
+        let _focus = focus;
         Ok(())
     }
 }

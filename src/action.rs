@@ -9,5 +9,5 @@ pub enum Action {
     ChangeFocus(Focus),
     Nothing,
     ActivateConfig(Vec<String>),
-    SelectFilteredItem(String),
+    SelectFilteredItem(String, Focus),
 }

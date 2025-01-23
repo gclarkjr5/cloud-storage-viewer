@@ -6,67 +6,19 @@ use ratatui::{
 };
 use tui_textarea::TextArea;
 
-use super::{connection_filter_results::ConnectionFilterResults, Component};
 use crate::{action::Action, app::Focus, config::Config, key::Key};
 
-// #[derive(Debug)]
-// pub enum ComponentFilter {
-//     ConnectionFilter(ConnectionFilter),
-//     ViewerFilter(ViewerFilter),
-// }
-
-// impl Default for ComponentFilter {
-//     fn default() -> Self {
-//         Self::ConnectionFilter(ConnectionFilter::default())
-//     }
-// }
-
-// impl Component for ComponentFilter {
-//     fn init(&mut self) -> std::io::Result<()> {
-//         match self {
-//             Self::ConnectionFilter(filter) => filter.init(),
-//             Self::ViewerFilter(filter) => filter.init(),
-//         }
-//     }
-//     fn register_config(&mut self, config: Config, focus: Focus) -> std::io::Result<()> {
-//         match self {
-//             Self::ConnectionFilter(filter) => filter.register_config(config, focus),
-//             Self::ViewerFilter(filter) => filter.register_config(config, focus),
-//         }
-//     }
-
-//     fn handle_key_event(
-//         &mut self,
-//         key_event: KeyEvent,
-//         focus: Focus,
-//     ) -> std::io::Result<Option<Action>> {
-//         match self {
-//             Self::ConnectionFilter(filter) => filter.handle_key_event(key_event, focus),
-//             Self::ViewerFilter(filter) => filter.handle_key_event(key_event, focus),
-//         }
-//     }
-//     fn draw(
-//         &mut self,
-//         frame: &mut ratatui::Frame,
-//         area: Rect,
-//         focus: Focus,
-//     ) -> std::io::Result<()> {
-//         match self {
-//             Self::ConnectionFilter(filter) => filter.draw(frame, area, focus),
-//             Self::ViewerFilter(filter) => filter.draw(frame, area, focus),
-//         }
-//     }
-// }
+use super::{viewer_filter_results::ViewerFilterResults, Component};
 
 #[derive(Debug, Default)]
-pub struct ConnectionFilter {
+pub struct ViewerFilter {
     pub config: Config,
     pub active: bool,
     pub textarea: TextArea<'static>,
-    pub filtered_results: ConnectionFilterResults,
+    pub filtered_results: ViewerFilterResults,
 }
 
-impl Component for ConnectionFilter {
+impl Component for ViewerFilter {
     fn init(&mut self) -> std::io::Result<()> {
         self.filtered_results.init()?;
         Ok(())
@@ -78,7 +30,7 @@ impl Component for ConnectionFilter {
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
     ) -> std::io::Result<()> {
-        let focused = matches!(focus, Focus::ConnectionsFilter);
+        let focused = matches!(focus, Focus::ViewerFilter);
         // let [content, _] =
         //     Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
 
@@ -88,8 +40,6 @@ impl Component for ConnectionFilter {
         let [filter, list_res] =
             Layout::vertical([Constraint::Percentage(7), Constraint::Percentage(93)]).areas(area);
 
-        // let filter = centered_rect(60, 25, area);
-
         self.textarea
             .set_cursor_line_style(ratatui::style::Style::default());
         self.textarea
@@ -97,24 +47,18 @@ impl Component for ConnectionFilter {
         self.textarea.set_style(Style::default().fg(Color::White));
         self.textarea.set_block(
             Block::bordered()
-                .title("Filter Connections")
+                .title("Filter CloudFS Results")
                 .border_style(if focused {
                     Style::new().blue()
                 } else {
                     Style::default()
                 }),
-            // Block::default()
-            //     .title("Filter Connections")
-            //     // .borders()
-            //     .style(Style::default()),
         );
-        // let popup = Popup::new("tui demo").style(Style::new().white().on_blue());
         if self.active {
             frame.render_widget(Clear, filter);
             frame.render_widget(&self.textarea, filter);
             frame.render_widget(Clear, list_res);
             self.filtered_results.draw(frame, list_res, focus)?;
-            // frame.render_widget(list, list_res);
         }
         Ok(())
     }
@@ -126,12 +70,12 @@ impl Component for ConnectionFilter {
     ) -> std::io::Result<Option<crate::action::Action>> {
         let key: Key = key_event.into();
         match focus {
-            Focus::ConnectionsFilter => {
+            Focus::ViewerFilter => {
                 if key == self.config.key_config.exit {
                     Ok(Some(Action::Quit))
                 } else if key == self.config.key_config.filter {
                     self.active = !self.active;
-                    Ok(Some(Action::ChangeFocus(Focus::Connections)))
+                    Ok(Some(Action::ChangeFocus(Focus::Viewer)))
                 } else if matches!(key, Key::Char(_))
                     || [
                         self.config.key_config.backspace,
@@ -153,7 +97,7 @@ impl Component for ConnectionFilter {
                 .iter()
                 .any(|kc| kc == &key)
                 {
-                    Ok(Some(Action::ChangeFocus(Focus::ConnectionFilterResults)))
+                    Ok(Some(Action::ChangeFocus(Focus::ViewerFilterResults)))
                 } else {
                     Ok(Some(Action::Nothing))
                 }

@@ -20,6 +20,7 @@ use crate::key::Key;
 use crate::util;
 
 use super::results_pager::ResultsPager;
+use super::viewer_filter::ViewerFilter;
 use super::Component;
 
 pub struct Viewer {
@@ -28,6 +29,7 @@ pub struct Viewer {
     pub tree: ETree<String>,
     pub items: Vec<TreeItem<'static, String>>,
     pub results_pager: ResultsPager,
+    pub filter: ViewerFilter,
 }
 
 impl Default for Viewer {
@@ -38,37 +40,12 @@ impl Default for Viewer {
             tree: ETree::new("".to_string()),
             items: Vec::new(),
             results_pager: ResultsPager::default(),
+            filter: ViewerFilter::default(),
         }
     }
 }
 
 impl Viewer {
-    // pub fn _update(active_connection: &str) -> Self {
-    //     let tree = ETree::new(active_connection.to_string());
-    //     let nodes = tree.nodes();
-    //     let mut items = vec![];
-    //     let results_pager = ResultsPager::default();
-
-    //     nodes
-    //         .filter(|node| node.parent().is_none())
-    //         .for_each(|node| {
-    //             let val = node.value().to_string();
-    //             let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
-    //                 .expect("error creating nodes under parent");
-
-    //             util::add_children(node, &mut ti, &mut results_pager.clone(), Focus::Connections);
-    //             items.push(ti);
-    //         });
-
-    //     Self {
-    //         config: Config::default(),
-    //         state: TreeState::default(),
-    //         tree: ETree::new(active_connection.to_string()),
-    //         items: Vec::new(),
-    //         results_pager: ResultsPager::default(),
-    //     }
-    // }
-
     pub fn increase_results_page(&mut self) -> Option<()> {
         // only increase page idx if we are on a page less than the number of pages
         if self.results_pager.page_idx + 1 < self.results_pager.num_pages {
@@ -116,6 +93,10 @@ pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
 }
 
 impl Component for Viewer {
+    fn init(&mut self) -> Result<()> {
+        self.filter.init()
+    }
+
     fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<()> {
         // find node, verify, unwrap, and set pager
         let found_node = self.find_node_to_append(path.clone());
@@ -145,7 +126,7 @@ impl Component for Viewer {
                 match root == &selection {
                     true => {
                         data.lines().for_each(|listing| {
-                            let res = listing.expect("error getting listing from stdout");
+                            let res = listing.expect("error getting listing");
                             self.tree
                                 .get_mut(node_to_append_to)
                                 .expect("error getting mutable node")
@@ -168,6 +149,7 @@ impl Component for Viewer {
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<()> {
         self.config = config;
+        self.filter.register_config(self.config.clone(), focus)?;
 
         let active_config = format!("{}", self.config.cloud_config);
 
@@ -251,7 +233,8 @@ impl Component for Viewer {
                     Ok(Some(Action::Nothing))
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
-                    let data = cli_command("gsutil", vec!["ls", selected.last().unwrap()]);
+                    let actual_request_path = selected.last().unwrap();
+                    let data = cli_command("gsutil", vec!["ls", actual_request_path]);
                     self.list_items(data, selected, focus)?;
                     Ok(None)
                 } else if key == self.config.key_config.next_page {
@@ -266,10 +249,43 @@ impl Component for Viewer {
                         util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
                     self.state.select(self.results_pager.paged_item.clone());
                     Ok(Some(Action::Nothing))
+                } else if key == self.config.key_config.filter {
+                    // activate filter
+                    self.filter.active = !self.filter.active;
+                    Ok(Some(Action::ChangeFocus(Focus::ViewerFilter)))
                 } else {
-                    Ok(None)
+                    Ok(Some(Action::Nothing))
                 }
             }
+            Focus::ViewerFilter => {
+                let action_opt = self.filter.handle_key_event(key_event, focus)?;
+                match action_opt {
+                    None => Ok(Some(Action::Nothing)),
+                    Some(action) => match action {
+                        Action::Filter(txt) => {
+                            let t = txt.last().unwrap();
+                            self.filter.filtered_results.items = self
+                                .tree
+                                .nodes()
+                                .filter(|n| n.value().contains(t) && n.value().contains('/'))
+                                .map(|n| n.value().to_string())
+                                .collect();
+                            self.filter.filtered_results.results = self
+                                .filter
+                                .filtered_results
+                                .results
+                                .clone()
+                                .items(self.filter.filtered_results.items.clone());
+                            Ok(None)
+                        }
+                        _ => Ok(Some(action)),
+                    },
+                }
+            }
+            Focus::ViewerFilterResults => self
+                .filter
+                .filtered_results
+                .handle_key_event(key_event, focus),
             _ => Ok(None),
         }
     }
@@ -360,6 +376,45 @@ impl Component for Viewer {
                 paging_area,
             );
         }
+        self.filter.draw(frame, viewer, focus)?;
         Ok(())
+    }
+
+    fn select_item(&mut self, selection: &str, focus: Focus) -> Result<()> {
+        if matches!(focus, Focus::Viewer) {
+            let mut tree_item_path: Vec<String> = vec![];
+
+            self.create_tree_item_path(&mut tree_item_path, Some(selection));
+
+            tree_item_path.reverse();
+
+            self.filter.active = !self.filter.active;
+            self.state.select(tree_item_path);
+        }
+        Ok(())
+    }
+}
+
+impl Viewer {
+    fn create_tree_item_path(
+        &self,
+        tree_item_path: &mut Vec<String>,
+        selection: Option<&str>,
+    ) -> Option<&String> {
+        // add path
+        tree_item_path.push(selection.unwrap().to_string());
+
+        // find node
+        let parent_node = self
+            .tree
+            .nodes()
+            .find(|node| node.value() == selection.unwrap())
+            .unwrap()
+            .parent();
+
+        match parent_node {
+            Some(parent) => self.create_tree_item_path(tree_item_path, Some(parent.value())),
+            None => None,
+        }
     }
 }

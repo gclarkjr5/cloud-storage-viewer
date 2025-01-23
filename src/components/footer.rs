@@ -80,6 +80,8 @@ impl Component for Footer {
                     "[Tab] ".blue(),
                     "List Items=".into(),
                     "[Enter] ".blue(),
+                    "Open Filter=".into(),
+                    "[Ctrl+f]".blue(),
                 ];
                 if self.results_pager.num_pages > 1 {
                     viewer_commands.push("Next Page=".into());
@@ -104,7 +106,7 @@ impl Component for Footer {
                 Paragraph::new(Line::from(filter_commands)).block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Connection Commands")
+                        .title("Filter Commands")
                         .style(Style::default()),
                 )
             }
@@ -122,7 +124,39 @@ impl Component for Footer {
                 Paragraph::new(Line::from(filter_commands)).block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Connection Commands")
+                        .title("Filter Results Commands")
+                        .style(Style::default()),
+                )
+            }
+            Focus::ViewerFilter => {
+                let filter_commands = vec![
+                    "Switch to Results=".into(),
+                    "[Enter/Tab] ".blue(),
+                    "Close Filter=".into(),
+                    "[Ctrl+f] ".blue(),
+                ];
+                Paragraph::new(Line::from(filter_commands)).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Filter Commands")
+                        .style(Style::default()),
+                )
+            }
+            Focus::ViewerFilterResults => {
+                let filter_commands = vec![
+                    "Up=".into(),
+                    "[k/Up Arrow] ".blue(),
+                    "Down=".into(),
+                    "[j/Down Arrow] ".blue(),
+                    "Switch to Filter=".into(),
+                    "[Tab] ".blue(),
+                    "Select Result=".into(),
+                    "[Enter] ".blue(),
+                ];
+                Paragraph::new(Line::from(filter_commands)).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Filter Results Commands")
                         .style(Style::default()),
                 )
             }

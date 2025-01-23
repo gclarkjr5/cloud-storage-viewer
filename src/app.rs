@@ -16,7 +16,9 @@ pub enum Focus {
     Connections,
     Viewer,
     ConnectionsFilter,
+    ViewerFilter,
     ConnectionFilterResults,
+    ViewerFilterResults,
 }
 
 #[must_use]
@@ -86,10 +88,10 @@ impl App {
                         component.register_config(self.config.clone(), self.focus)?;
                     }
                 }
-                Action::SelectFilteredItem(item) => {
-                    self.change_focus(Focus::Connections);
+                Action::SelectFilteredItem(item, focus) => {
+                    self.change_focus(focus);
                     for component in self.components.iter_mut() {
-                        component.select_item(&item)?;
+                        component.select_item(&item, self.focus)?;
                     }
                 }
                 Action::Nothing => (),

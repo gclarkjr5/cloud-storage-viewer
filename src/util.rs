@@ -57,10 +57,13 @@ pub fn add_children(
                     .for_each(|n| {
                         // prettify child text
                         let child_val = n.value().to_string();
-                        let split_text = child_val.split('/');
                         let clean_text = match focus {
-                            Focus::Connections => split_text.last().unwrap().to_string(),
-                            _ => {
+                            Focus::Connections => {
+                                let split_text = child_val.split('/');
+                                split_text.last().unwrap().to_string()
+                            }
+                            Focus::Viewer => {
+                                let split_text = child_val.split('/');
                                 if split_text.clone().count() <= 4 {
                                     child_val.clone()
                                 } else if split_text.clone().last().unwrap() == "" {
@@ -69,6 +72,7 @@ pub fn add_children(
                                     split_text.last().unwrap().to_string()
                                 }
                             }
+                            _ => child_val.clone(),
                         };
 
                         let mut child_ti =
@@ -83,12 +87,14 @@ pub fn add_children(
             }
         } else {
             node.children().for_each(|n| {
-                // println!("got child: {:?}", n.value());
                 let child_val = n.value().to_string();
-                let split_text = child_val.split('/');
                 let clean_text = match focus {
-                    Focus::Connections => split_text.last().unwrap().to_string(),
-                    _ => {
+                    Focus::Connections => {
+                        let split_text = child_val.split('/');
+                        split_text.last().unwrap().to_string()
+                    }
+                    Focus::Viewer => {
+                        let split_text = child_val.split('/');
                         if split_text.clone().count() <= 4 {
                             child_val.clone()
                         } else if split_text.clone().last().unwrap() == "" {
@@ -97,6 +103,7 @@ pub fn add_children(
                             split_text.last().unwrap().to_string()
                         }
                     }
+                    _ => child_val.clone(),
                 };
 
                 let mut child_ti = TreeItem::new(child_val.clone(), clean_text.clone(), vec![])
