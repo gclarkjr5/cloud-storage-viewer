@@ -29,6 +29,7 @@ pub struct Viewer {
     pub tree: ETree<String>,
     pub items: Vec<TreeItem<'static, String>>,
     pub results_pager: ResultsPager,
+    pub pagers: Vec<ResultsPager>,
     pub filter: ViewerFilter,
 }
 
@@ -40,6 +41,7 @@ impl Default for Viewer {
             tree: ETree::new("".to_string()),
             items: Vec::new(),
             results_pager: ResultsPager::default(),
+            pagers: Vec::new(),
             filter: ViewerFilter::default(),
         }
     }
@@ -109,8 +111,6 @@ impl Component for Viewer {
 
         let is_directory = selection.chars().last().expect("error getting last char") == '/';
 
-        self.results_pager.init(&data, path.clone());
-
         match is_directory {
             true => {
                 data.lines().for_each(|listing| {
@@ -139,6 +139,8 @@ impl Component for Viewer {
         }
 
         // remake tree widget
+        self.results_pager.init(&data, path.clone());
+        self.pagers.push(self.results_pager.clone());
         self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
 
         self.state.open(path.clone());
@@ -353,29 +355,34 @@ impl Component for Viewer {
         frame.render_widget(Clear, viewer);
         frame.render_stateful_widget(widget, viewer, &mut self.state);
 
-        if self.results_pager.num_pages > 1 {
-            let paging_info = format!(
-                "currently paging: {}
+        // if self.results_pager.num_pages > 1 {
+        let paging_info = format!(
+            "currently paging: {}
                     page: {} of {}
                     showing: {} of {}",
-                self.results_pager.paged_item.last().unwrap(),
-                self.results_pager.page_idx + 1,
-                self.results_pager.num_pages,
-                self.results_pager.results_per_page,
-                self.results_pager.total_results,
-            );
-            #[allow(clippy::cast_possible_truncation)]
-            let paging_area = Rect {
-                y: viewer.height - 2,
-                height: 10,
-                x: frame.area().width.saturating_sub(paging_info.len() as u16),
-                width: paging_info.len() as u16,
-            };
-            frame.render_widget(
-                Span::styled(paging_info, Style::new().fg(Color::Black).bg(Color::Gray)),
-                paging_area,
-            );
-        }
+            if let Some(item) = self.results_pager.paged_item.last() {
+                item
+            } else {
+                "Nothing being paged"
+            },
+            // self.results_pager.paged_item.last().unwrap(),
+            self.results_pager.page_idx + 1,
+            self.results_pager.num_pages,
+            self.results_pager.results_per_page,
+            self.results_pager.total_results,
+        );
+        #[allow(clippy::cast_possible_truncation)]
+        let paging_area = Rect {
+            y: viewer.height - 2,
+            height: 10,
+            x: frame.area().width.saturating_sub(paging_info.len() as u16),
+            width: paging_info.len() as u16,
+        };
+        frame.render_widget(
+            Span::styled(paging_info, Style::new().fg(Color::Black).bg(Color::Gray)),
+            paging_area,
+        );
+        // }
         self.filter.draw(frame, viewer, focus)?;
         Ok(())
     }
@@ -424,16 +431,43 @@ impl Component for Viewer {
                         );
                     }
                 }
-                false => unimplemented!(),
+                false => {
+                    // while not currently paging this parent, does it have multiple pages?
+                    if selection_parent.children().count() > self.results_pager.results_per_page {
+                        // find which page
+                        let mut new_page_idx = 0;
+                        let children: Vec<NodeRef<String>> = selection_parent.children().collect();
+                        children
+                            .chunks(self.results_pager.results_per_page)
+                            .enumerate()
+                            .for_each(|(chunk_idx, chunk)| {
+                                if chunk.iter().any(|n| n.value() == selection) {
+                                    new_page_idx = chunk_idx;
+                                }
+                            });
+
+                        let other_pager = self
+                            .pagers
+                            .iter()
+                            .find(|p| p.paged_item.last().unwrap() == selection_parent.value())
+                            .unwrap()
+                            .clone();
+
+                        self.results_pager = other_pager;
+
+                        // set the page, re-list-items
+                        self.results_pager.set_page_idx(new_page_idx);
+                        self.items = util::make_tree_items(
+                            self.tree.nodes(),
+                            &mut self.results_pager,
+                            focus,
+                        );
+                    }
+                }
             }
             // if not, check if its parent has multiple pages currently listed
             // set results pager to that parent
             // get idx of selection within parent
-            if self.results_pager.num_pages > 1 {
-                // which page/chunk is the child in
-
-                // set the results pager idx to be that
-            }
 
             self.filter.active = !self.filter.active;
             self.state.select(tree_item_path);
