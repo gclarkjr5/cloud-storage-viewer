@@ -51,4 +51,7 @@ impl ResultsPager {
             }
         }
     }
+    pub fn set_page_idx(&mut self, new_page_idx: usize) {
+        self.page_idx = new_page_idx;
+    }
 }

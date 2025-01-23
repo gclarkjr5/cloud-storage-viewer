@@ -1,7 +1,7 @@
 use std::{io::BufRead, io::Result, process::Command};
 
 use crossterm::event::{KeyEvent, MouseEventKind};
-use ego_tree::{NodeId, Tree as ETree};
+use ego_tree::{NodeId, NodeRef, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::Span;
@@ -387,6 +387,53 @@ impl Component for Viewer {
             self.create_tree_item_path(&mut tree_item_path, Some(selection));
 
             tree_item_path.reverse();
+
+            // is the parent of the selection == to the results pager
+            let selection_parent = self
+                .tree
+                .nodes()
+                .find(|n| n.value() == selection)
+                .unwrap()
+                .parent()
+                .unwrap();
+            let parent_is_current_pager =
+                selection_parent.value() == self.results_pager.paged_item.last().unwrap();
+
+            match parent_is_current_pager {
+                true => {
+                    // if so, more than 1 page?
+                    if self.results_pager.num_pages > 1 {
+                        // find which page
+                        let mut new_page_idx = 0;
+                        let children: Vec<NodeRef<String>> = selection_parent.children().collect();
+                        children
+                            .chunks(self.results_pager.results_per_page)
+                            .enumerate()
+                            .for_each(|(chunk_idx, chunk)| {
+                                if chunk.iter().any(|n| n.value() == selection) {
+                                    new_page_idx = chunk_idx;
+                                }
+                            });
+
+                        // set the page, re-list-items
+                        self.results_pager.set_page_idx(new_page_idx);
+                        self.items = util::make_tree_items(
+                            self.tree.nodes(),
+                            &mut self.results_pager,
+                            focus,
+                        );
+                    }
+                }
+                false => unimplemented!(),
+            }
+            // if not, check if its parent has multiple pages currently listed
+            // set results pager to that parent
+            // get idx of selection within parent
+            if self.results_pager.num_pages > 1 {
+                // which page/chunk is the child in
+
+                // set the results pager idx to be that
+            }
 
             self.filter.active = !self.filter.active;
             self.state.select(tree_item_path);
