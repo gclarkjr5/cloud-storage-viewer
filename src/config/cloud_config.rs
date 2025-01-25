@@ -1,6 +1,7 @@
 use std::fmt::{self, Display};
-use std::io::{BufRead, Result};
+use std::io::{BufRead, Error};
 use std::process::Command;
+use std::result::Result;
 
 #[derive(Debug, Clone)]
 pub struct CloudConfig {
@@ -39,7 +40,7 @@ impl Default for CloudConfig {
 }
 
 impl CloudConfig {
-    pub fn init(&mut self) -> Result<()> {
+    pub fn init(&mut self) -> Result<(), Error> {
         for cloud_provider in self.cloud_providers.iter_mut() {
             cloud_provider.init()
         }
@@ -63,7 +64,7 @@ impl CloudConfig {
             });
     }
 
-    pub fn activate_config(&mut self, path_identifier: Vec<String>) -> Result<()> {
+    pub fn activate_config(&mut self, path_identifier: Vec<String>) -> Result<(), String> {
         // get the cloud in the path identifer as well as possible new connection
         let cloud_provider = path_identifier[1].clone().into();
         let new_config = path_identifier[2]
@@ -73,24 +74,41 @@ impl CloudConfig {
             .unwrap()
             .to_string();
 
-        self.cloud_providers
+        let activation: Result<(), String> = self
+            .cloud_providers
             .iter()
-            .for_each(|cp| match (cp, &cloud_provider) {
-                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
+            .map(|cp| match (cp, &cloud_provider) {
+                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
+                    let message = format!("{} has not been implemented yet.", cp);
+                    Err(message)
+                }
                 (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => {
                     let current_conn = cp.get_active_config();
 
                     if current_conn != new_config {
                         cp.activate_new_config(new_config.clone());
                     }
+                    Ok(())
                 }
-                (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
-                _ => (),
-            });
-        // self.init();
-        self.update(cloud_provider);
+                (CloudProvider::S3(_), CloudProvider::S3(_)) => {
+                    let message = format!("{} has not been implemented yet.", cp);
+                    Err(message)
+                }
+                _ => {
+                    let message = format!(
+                        "A mismatch between cloud providers {} and {}",
+                        cp, &cloud_provider
+                    );
+                    Err(message)
+                }
+            })
+            .collect();
 
-        Ok(())
+        if activation.is_ok() {
+            self.update(cloud_provider);
+        }
+
+        activation
     }
 
     fn update(&mut self, cloud_provider: CloudProvider) {
@@ -224,17 +242,6 @@ impl From<String> for CloudProvider {
     }
 }
 
-// impl Cloud {
-//     fn init(&mut self) -> Result<()> {
-//         match self {
-//             // Self::Azure(config) => config.init()?,
-//             Self::Gcs(config) => config.init(),
-//             // Self::S3(config) => config.init()?,
-//             _ => Ok(()),
-//         }
-//     }
-// }
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct S3Config {
     pub name: String,
@@ -250,27 +257,3 @@ pub struct GcsConfig {
     pub name: String,
     pub is_active: String,
 }
-
-// impl Conf for GcsConfig {}
-// impl GcsConfig {
-//     fn default() -> Box<dyn Conf> {
-//         Box::new(GcsConfig {
-//             name: String::new(),
-//             is_active: String::new(),
-//         })
-//     }
-// }
-// impl Conf for S3Config {}
-// impl Conf for AzureConfig {}
-
-// impl CreateConfig<S3Config> for Cloud {
-//     fn list() -> Self {
-//         Self::S3(vec![S3Config::default()])
-//     }
-// }
-
-// impl CreateConfig<AzureConfig> for Cloud {
-//     fn list() -> Self {
-//         Self::Azure(vec![AzureConfig::default()])
-//     }
-// }

@@ -11,8 +11,8 @@ use ratatui::widgets::block::Block;
 use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 
 use ratatui::Frame;
-use std::io::Result;
 use std::process::Command;
+use std::result::Result;
 use std::sync::Arc;
 use std::vec;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
@@ -52,7 +52,11 @@ impl Connections {
         }
     }
 
-    pub fn list_cloud_provider(&mut self, selection: Vec<String>, focus: Focus) -> Result<()> {
+    pub fn list_cloud_provider(
+        &mut self,
+        selection: Vec<String>,
+        focus: Focus,
+    ) -> Result<(), String> {
         let cloud_provider: CloudProvider = selection[1].clone().into();
         // find the node to append to
         let found_node = self.find_node_to_append(cloud_provider.clone().into());
@@ -63,12 +67,16 @@ impl Connections {
         }
         let (_selected, node_to_append_to) = found_node.unwrap();
 
-        self.config
+        let activation: Result<(), String> = self
+            .config
             .cloud_config
             .cloud_providers
             .iter()
-            .for_each(|cp| match (cp, &cloud_provider) {
-                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
+            .map(|cp| match (cp, &cloud_provider) {
+                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
+                    let message = format!("{} has not been implemented yet.", cp);
+                    Err(message)
+                }
                 (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
                     configs.iter().for_each(|config| {
                         let res = format!("{}/{}", cp, config.name.clone());
@@ -77,19 +85,33 @@ impl Connections {
                             .get_mut(node_to_append_to)
                             .expect("error getting mutable node")
                             .append(res);
-                    })
+                    });
+                    Ok(())
                 }
-                (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
-                _ => (),
-            });
+                (CloudProvider::S3(_), CloudProvider::S3(_)) => {
+                    let message = format!("{} has not been implemented yet.", cp);
+                    Err(message)
+                }
+                _ => {
+                    let message = format!(
+                        "A mismatch between cloud providers {} and {}",
+                        cp, &cloud_provider
+                    );
+                    Err(message)
+                }
+            })
+            .collect();
 
-        // convert tree into tree widget items
-        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-        self.state.open(selection);
-        Ok(())
+        if activation.is_ok() {
+            // convert tree into tree widget items
+            self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+            self.state.open(selection);
+        }
+
+        activation
     }
 
-    pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Vec<u8>> {
+    pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Vec<u8>, String> {
         // set active cloud
         self.config.cloud_config.activate_config(path)?;
 
@@ -117,7 +139,7 @@ impl Connections {
 }
 
 impl Component for Connections {
-    fn init(&mut self) -> Result<()> {
+    fn init(&mut self) -> Result<(), String> {
         let mut tree = ETree::new("Connections".to_string());
 
         self.config
@@ -155,7 +177,7 @@ impl Component for Connections {
         &mut self,
         mouse_event: crossterm::event::MouseEvent,
         focus: Focus,
-    ) -> Result<Option<Action>> {
+    ) -> Result<Option<Action>, String> {
         match focus {
             Focus::Connections => match mouse_event.kind {
                 MouseEventKind::ScrollDown => {
@@ -178,7 +200,11 @@ impl Component for Connections {
         }
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Option<Action>> {
+    fn handle_key_event(
+        &mut self,
+        key_event: KeyEvent,
+        focus: Focus,
+    ) -> Result<Option<Action>, String> {
         let key: Key = key_event.into();
         match focus {
             Focus::Connections => {
@@ -371,7 +397,7 @@ impl Component for Connections {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<()> {
+    fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<(), String> {
         let focused = matches!(focus, Focus::Connections);
         let [content, _] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
@@ -412,12 +438,12 @@ impl Component for Connections {
         Ok(())
     }
 
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<()> {
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
         self.filter.register_config(self.config.clone(), focus)?;
         Ok(())
     }
-    fn select_item(&mut self, item: &str, focus: Focus) -> Result<()> {
+    fn select_item(&mut self, item: &str, focus: Focus) -> Result<(), String> {
         if matches!(focus, Focus::Connections) {
             let mut selection = vec!["Connections".to_string()];
 

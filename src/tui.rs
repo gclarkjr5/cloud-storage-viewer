@@ -1,4 +1,5 @@
-use std::io::{stdout, Result, Stdout};
+use std::io::{stdout, Stdout};
+use std::result::Result;
 
 use crossterm::{
     event::{EnableMouseCapture, KeyEvent, MouseEvent},
@@ -24,28 +25,66 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn new() -> Result<Self> {
-        Ok(Self {
-            terminal: ratatui::Terminal::new(Backend::new(stdout()))?,
-        })
+    pub fn new() -> Result<Self, String> {
+        let terminal = ratatui::Terminal::new(Backend::new(stdout()));
+
+        if terminal.is_ok() {
+            Ok(Self {
+                terminal: terminal.unwrap(),
+            })
+        } else {
+            let message = format!("Error attaching a new Ratatui terminal");
+            Err(message)
+        }
     }
 
-    pub fn enter(&mut self) -> std::io::Result<()> {
-        crossterm::terminal::enable_raw_mode()?;
-        crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture,)?;
+    pub fn enter(&mut self) -> Result<(), String> {
+        if crossterm::terminal::enable_raw_mode().is_ok() {
+            crossterm::terminal::enable_raw_mode().unwrap()
+        }
+
+        if crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture,).is_ok() {
+            crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture,).unwrap()
+        }
 
         Ok(())
     }
 
-    pub fn exit(&mut self) -> std::io::Result<()> {
-        crossterm::terminal::disable_raw_mode()?;
-        crossterm::execute!(
-            self.terminal.backend_mut(),
-            crossterm::terminal::LeaveAlternateScreen,
-            crossterm::event::DisableMouseCapture
-        )?;
-        self.terminal.show_cursor()?;
+    pub fn exit(&mut self) -> Result<(), String> {
+        match crossterm::terminal::disable_raw_mode() {
+            Ok(()) => {
+                match crossterm::execute!(
+                    self.terminal.backend_mut(),
+                    crossterm::terminal::LeaveAlternateScreen,
+                    crossterm::event::DisableMouseCapture
+                ) {
+                    Ok(()) => match self.terminal.show_cursor() {
+                        Ok(()) => Ok(()),
+                        Err(_) => {
+                            let message = format!("Error clearing terminal");
+                            Err(message)
+                        }
+                    },
+                    Err(_) => {
+                        let message = format!("Error mutating Crossterm backend on exit");
+                        Err(message)
+                    }
+                }
+            }
+            Err(_) => {
+                let message = format!("Error disabling raw mode");
+                return Err(message);
+            }
+        }
+    }
 
-        Ok(())
+    pub fn clear(&mut self) -> Result<(), String> {
+        if self.terminal.clear().is_ok() {
+            self.terminal.clear().unwrap();
+            Ok(())
+        } else {
+            let message = format!("Error clearing terminal");
+            Err(message)
+        }
     }
 }

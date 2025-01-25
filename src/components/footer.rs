@@ -1,4 +1,4 @@
-use std::io::Result;
+use std::result::Result;
 
 use ratatui::{
     layout::{Constraint, Layout},
@@ -18,12 +18,17 @@ pub struct Footer {
 }
 
 impl Component for Footer {
-    fn register_config(&mut self, config: Config, _focus: Focus) -> Result<()> {
+    fn register_config(&mut self, config: Config, _focus: Focus) -> Result<(), String> {
         self.config = config;
         Ok(())
     }
 
-    fn list_items(&mut self, data: Vec<u8>, _path: Vec<String>, _focus: Focus) -> Result<()> {
+    fn list_items(
+        &mut self,
+        data: Vec<u8>,
+        _path: Vec<String>,
+        _focus: Focus,
+    ) -> Result<(), String> {
         self.results_pager.init(&data, Vec::new());
         Ok(())
     }
@@ -33,7 +38,7 @@ impl Component for Footer {
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         let [_, footer] = Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
 
         let [active_connection, commands, quit_and_close] = Layout::horizontal([
@@ -143,6 +148,24 @@ impl Component for Footer {
                 )
             }
             Focus::ViewerFilterResults => {
+                let filter_commands = vec![
+                    "Up=".into(),
+                    "[k/Up Arrow] ".blue(),
+                    "Down=".into(),
+                    "[j/Down Arrow] ".blue(),
+                    "Switch to Filter=".into(),
+                    "[Tab] ".blue(),
+                    "Select Result=".into(),
+                    "[Enter] ".blue(),
+                ];
+                Paragraph::new(Line::from(filter_commands)).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Filter Results Commands")
+                        .style(Style::default()),
+                )
+            }
+            Focus::Error => {
                 let filter_commands = vec![
                     "Up=".into(),
                     "[k/Up Arrow] ".blue(),

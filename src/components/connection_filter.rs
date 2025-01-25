@@ -4,6 +4,7 @@ use ratatui::{
     style::{Color, Style, Stylize},
     widgets::{Block, Clear},
 };
+use std::result::Result;
 use tui_textarea::TextArea;
 
 use super::{connection_filter_results::ConnectionFilterResults, Component};
@@ -18,7 +19,7 @@ pub struct ConnectionFilter {
 }
 
 impl Component for ConnectionFilter {
-    fn init(&mut self) -> std::io::Result<()> {
+    fn init(&mut self) -> Result<(), String> {
         self.filtered_results.init()?;
         Ok(())
     }
@@ -28,7 +29,7 @@ impl Component for ConnectionFilter {
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), String> {
         let focused = matches!(focus, Focus::ConnectionsFilter);
 
         let [filter, list_res] =
@@ -62,7 +63,7 @@ impl Component for ConnectionFilter {
         &mut self,
         key_event: KeyEvent,
         focus: crate::app::Focus,
-    ) -> std::io::Result<Option<crate::action::Action>> {
+    ) -> Result<Option<crate::action::Action>, String> {
         let key: Key = key_event.into();
         match focus {
             Focus::ConnectionsFilter => {
@@ -101,7 +102,7 @@ impl Component for ConnectionFilter {
         }
     }
 
-    fn register_config(&mut self, config: Config, focus: Focus) -> std::io::Result<()> {
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
         self.filtered_results
             .register_config(self.config.clone(), focus)?;

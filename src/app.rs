@@ -1,4 +1,4 @@
-use std::io::Result;
+use std::result::Result;
 use std::time::Duration;
 
 use crossterm::event::{Event, KeyEvent, MouseEvent};
@@ -6,6 +6,7 @@ use crossterm::event::{Event, KeyEvent, MouseEvent};
 use super::components::connections::Connections;
 use super::components::viewer::Viewer;
 use crate::action::Action;
+use crate::components::error::ErrorComponent;
 use crate::components::footer::Footer;
 use crate::components::Component as Comp;
 use crate::config::Config;
@@ -19,6 +20,7 @@ pub enum Focus {
     ViewerFilter,
     ConnectionFilterResults,
     ViewerFilterResults,
+    Error,
 }
 
 #[must_use]
@@ -37,17 +39,18 @@ impl App {
                 Box::new(Connections::new()),
                 Box::new(Viewer::default()),
                 Box::new(Footer::default()),
+                Box::new(ErrorComponent::default()),
             ],
             focus: Focus::Connections,
             config: Config::default(),
         }
     }
 
-    pub fn run(&mut self) -> std::io::Result<()> {
+    pub fn run(&mut self) -> Result<(), String> {
         // start the TUI
         let mut tui = Tui::new()?;
         tui.enter()?;
-        tui.terminal.clear()?;
+        tui.clear()?;
 
         // regisration
         // for component in self.components.iter_mut() {
@@ -67,6 +70,7 @@ impl App {
             // after drawing, handle terminal events
             match self.handle_events()? {
                 Action::Quit => break,
+                Action::Error(message) => self.report_error(message),
                 Action::ChangeFocus(focus) => self.change_focus(focus),
                 Action::ListCloudProvider(cloud_config) => {
                     self.config.cloud_config = cloud_config;
@@ -116,7 +120,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_events(&mut self) -> Result<Action> {
+    fn handle_events(&mut self) -> Result<Action, String> {
         if crossterm::event::poll(Duration::from_millis(250))? {
             match crossterm::event::read()? {
                 Event::Key(key) => self.handle_key_events(key),
@@ -129,7 +133,7 @@ impl App {
         }
     }
 
-    fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action> {
+    fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action, String> {
         // convert key event into Key
         // let key: Key = key_event.into();
 
@@ -149,7 +153,7 @@ impl App {
         Ok(res)
     }
 
-    fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action> {
+    fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action, String> {
         let res = Action::Nothing;
         // handle event for components
         for component in self.components.iter_mut() {
@@ -162,7 +166,13 @@ impl App {
         self.focus = focus;
     }
 
-    pub fn render(&mut self, tui: &mut Tui) -> Result<()> {
+    pub fn report_error(&mut self, message: String) {
+        for component in self.components.iter_mut() {
+            component.report_error(message.clone());
+        }
+    }
+
+    pub fn render(&mut self, tui: &mut Tui) -> Result<(), String> {
         tui.terminal.draw(|frame| {
             for component in self.components.iter_mut() {
                 if let Err(err) = component.draw(frame, frame.area(), self.focus) {

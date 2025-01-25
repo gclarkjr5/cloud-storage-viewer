@@ -2,6 +2,7 @@ use ratatui::{
     style::{Color, Modifier, Style, Stylize},
     widgets::{Block, List, ListDirection, ListState},
 };
+use std::result::Result;
 
 use crate::{action::Action, app::Focus, config::Config, key::Key};
 
@@ -22,16 +23,8 @@ impl Component for ConnectionFilterResults {
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), String> {
         let focused = matches!(focus, Focus::ConnectionFilterResults);
-        // let [content, _] =
-        //     Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
-
-        // let [connections, _viewer] =
-        //     Layout::horizontal([Constraint::Percentage(15), Constraint::Min(1)]).areas(content);
-
-        // let [_, results] =
-        //     Layout::vertical([Constraint::Percentage(7), Constraint::Percentage(93)]).areas(area);
         let list = self
             .results
             .clone()
@@ -64,7 +57,7 @@ impl Component for ConnectionFilterResults {
         &mut self,
         config: crate::config::Config,
         _focus: Focus,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), String> {
         self.config = config;
         Ok(())
     }
@@ -73,7 +66,7 @@ impl Component for ConnectionFilterResults {
         &mut self,
         key_event: crossterm::event::KeyEvent,
         focus: Focus,
-    ) -> std::io::Result<Option<crate::action::Action>> {
+    ) -> Result<Option<crate::action::Action>, String> {
         let key: Key = key_event.into();
         match focus {
             Focus::ConnectionFilterResults => {

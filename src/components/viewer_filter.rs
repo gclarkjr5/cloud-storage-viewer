@@ -4,6 +4,7 @@ use ratatui::{
     style::{Color, Style, Stylize},
     widgets::{Block, Clear},
 };
+use std::result::Result;
 use tui_textarea::TextArea;
 
 use crate::{action::Action, app::Focus, config::Config, key::Key};
@@ -19,7 +20,7 @@ pub struct ViewerFilter {
 }
 
 impl Component for ViewerFilter {
-    fn init(&mut self) -> std::io::Result<()> {
+    fn init(&mut self) -> Result<(), String> {
         self.filtered_results.init()?;
         Ok(())
     }
@@ -29,7 +30,7 @@ impl Component for ViewerFilter {
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), String> {
         let focused = matches!(focus, Focus::ViewerFilter);
         // let [content, _] =
         //     Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
@@ -67,7 +68,7 @@ impl Component for ViewerFilter {
         &mut self,
         key_event: KeyEvent,
         focus: crate::app::Focus,
-    ) -> std::io::Result<Option<crate::action::Action>> {
+    ) -> Result<Option<Action>, String> {
         let key: Key = key_event.into();
         match focus {
             Focus::ViewerFilter => {
@@ -106,7 +107,7 @@ impl Component for ViewerFilter {
         }
     }
 
-    fn register_config(&mut self, config: Config, focus: Focus) -> std::io::Result<()> {
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
         self.filtered_results
             .register_config(self.config.clone(), focus)?;

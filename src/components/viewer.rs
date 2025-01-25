@@ -1,5 +1,6 @@
+use std::result::Result;
 use std::sync::Arc;
-use std::{io::BufRead, io::Result, process::Command};
+use std::{io::BufRead, process::Command};
 
 use crossterm::event::{KeyEvent, MouseEventKind};
 use ego_tree::{NodeId, NodeRef, Tree as ETree};
@@ -98,11 +99,11 @@ pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
 }
 
 impl Component for Viewer {
-    fn init(&mut self) -> Result<()> {
+    fn init(&mut self) -> Result<(), String> {
         self.filter.init()
     }
 
-    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<()> {
+    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<(), String> {
         // find node, verify, unwrap, and set pager
         let found_node = self.find_node_to_append(path.clone());
 
@@ -152,7 +153,7 @@ impl Component for Viewer {
         Ok(())
     }
 
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<()> {
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
         self.filter.register_config(self.config.clone(), focus)?;
 
@@ -180,7 +181,11 @@ impl Component for Viewer {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Option<Action>> {
+    fn handle_key_event(
+        &mut self,
+        key_event: KeyEvent,
+        focus: Focus,
+    ) -> Result<Option<Action>, String> {
         let key: Key = key_event.into();
         match focus {
             Focus::Viewer => {
@@ -365,7 +370,7 @@ impl Component for Viewer {
         &mut self,
         mouse_event: crossterm::event::MouseEvent,
         focus: Focus,
-    ) -> Result<Option<Action>> {
+    ) -> Result<Option<Action>, String> {
         match focus {
             Focus::Viewer => match mouse_event.kind {
                 MouseEventKind::ScrollDown => {
@@ -387,7 +392,12 @@ impl Component for Viewer {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect, focus: crate::app::Focus) -> Result<()> {
+    fn draw(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        focus: crate::app::Focus,
+    ) -> Result<(), String> {
         let focused = matches!(focus, Focus::Viewer);
         let [content, _] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
@@ -456,7 +466,7 @@ impl Component for Viewer {
         Ok(())
     }
 
-    fn select_item(&mut self, selection: &str, focus: Focus) -> Result<()> {
+    fn select_item(&mut self, selection: &str, focus: Focus) -> Result<(), String> {
         if matches!(focus, Focus::Viewer) {
             let mut tree_item_path: Vec<String> = vec![];
 

@@ -9,28 +9,33 @@ use crate::{action::Action, app::Focus, config::Config, key::Key};
 use super::Component;
 
 #[derive(Debug, Default, Clone)]
-pub struct ViewerFilterResults {
+pub struct ErrorComponent {
     pub config: Config,
-    pub items: Vec<String>,
-    pub filtered_items: Vec<String>,
-    pub results: List<'static>,
-    pub state: ListState,
+    pub message: String,
 }
 
-impl Component for ViewerFilterResults {
+impl Component for ErrorComponent {
     fn draw(
         &mut self,
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
     ) -> Result<(), String> {
-        let focused = matches!(focus, Focus::ViewerFilterResults);
+        let focused = matches!(focus, Focus::Error);
+        // let [content, _] =
+        //     Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
+
+        // let [connections, _viewer] =
+        //     Layout::horizontal([Constraint::Percentage(15), Constraint::Min(1)]).areas(content);
+
+        // let [_, results] =
+        //     Layout::vertical([Constraint::Percentage(7), Constraint::Percentage(93)]).areas(area);
         let list = self
             .results
             .clone()
             .block(
                 Block::bordered()
-                    .title("CloudFS Results Filtered")
+                    .title("Connection Results Filtered")
                     .border_style(if focused {
                         Style::new().blue()
                     } else {
@@ -69,33 +74,9 @@ impl Component for ViewerFilterResults {
     ) -> Result<Option<crate::action::Action>, String> {
         let key: Key = key_event.into();
         match focus {
-            Focus::ViewerFilterResults => {
+            Focus::ConnectionFilterResults => {
                 if key == self.config.key_config.exit {
                     Ok(Some(Action::Quit))
-                } else if key == self.config.key_config.enter {
-                    let item_idx = self.state.selected().unwrap();
-                    let item = self.filtered_items[item_idx].clone();
-                    Ok(Some(Action::SelectFilteredItem(item, Focus::Viewer)))
-                } else if [
-                    self.config.key_config.key_up,
-                    self.config.key_config.arrow_up,
-                ]
-                .iter()
-                .any(|kc| kc == &key)
-                {
-                    self.state.select_previous();
-                    Ok(None)
-                } else if [
-                    self.config.key_config.key_down,
-                    self.config.key_config.arrow_down,
-                ]
-                .iter()
-                .any(|kc| kc == &key)
-                {
-                    self.state.select_next();
-                    Ok(Some(Action::Nothing))
-                } else if key == self.config.key_config.change_focus {
-                    Ok(Some(Action::ChangeFocus(Focus::ViewerFilter)))
                 } else {
                     Ok(Some(Action::Nothing))
                 }
