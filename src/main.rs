@@ -1,4 +1,5 @@
 use logging::initialize_logging;
+use std::result::Result;
 
 mod action;
 mod app;
@@ -11,7 +12,7 @@ mod util;
 
 use crate::app::App;
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), String> {
     initialize_logging().expect("error initializing logging");
 
     let mut app = App::new();

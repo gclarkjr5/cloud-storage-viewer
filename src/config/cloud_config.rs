@@ -1,5 +1,5 @@
 use std::fmt::{self, Display};
-use std::io::{BufRead, Error};
+use std::io::BufRead;
 use std::process::Command;
 use std::result::Result;
 
@@ -40,7 +40,7 @@ impl Default for CloudConfig {
 }
 
 impl CloudConfig {
-    pub fn init(&mut self) -> Result<(), Error> {
+    pub fn init(&mut self) -> Result<(), String> {
         for cloud_provider in self.cloud_providers.iter_mut() {
             cloud_provider.init()
         }
@@ -74,41 +74,24 @@ impl CloudConfig {
             .unwrap()
             .to_string();
 
-        let activation: Result<(), String> = self
-            .cloud_providers
+        self.cloud_providers
             .iter()
-            .map(|cp| match (cp, &cloud_provider) {
-                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
-                    let message = format!("{} has not been implemented yet.", cp);
-                    Err(message)
-                }
+            .for_each(|cp| match (cp, &cloud_provider) {
+                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
                 (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => {
                     let current_conn = cp.get_active_config();
 
                     if current_conn != new_config {
                         cp.activate_new_config(new_config.clone());
                     }
-                    Ok(())
                 }
-                (CloudProvider::S3(_), CloudProvider::S3(_)) => {
-                    let message = format!("{} has not been implemented yet.", cp);
-                    Err(message)
-                }
-                _ => {
-                    let message = format!(
-                        "A mismatch between cloud providers {} and {}",
-                        cp, &cloud_provider
-                    );
-                    Err(message)
-                }
-            })
-            .collect();
+                (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
+                _ => (),
+            });
 
-        if activation.is_ok() {
-            self.update(cloud_provider);
-        }
+        self.update(cloud_provider);
 
-        activation
+        Ok(())
     }
 
     fn update(&mut self, cloud_provider: CloudProvider) {

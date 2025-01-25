@@ -1,10 +1,11 @@
 use ratatui::{
-    style::{Color, Modifier, Style, Stylize},
-    widgets::{Block, List, ListDirection, ListState},
+    layout::{Constraint, Layout},
+    style::{Style, Stylize},
 };
 use std::result::Result;
+use tui_popup::Popup;
 
-use crate::{action::Action, app::Focus, config::Config, key::Key};
+use crate::{action::Action, app::Focus, config::Config};
 
 use super::Component;
 
@@ -22,39 +23,19 @@ impl Component for ErrorComponent {
         focus: crate::app::Focus,
     ) -> Result<(), String> {
         let focused = matches!(focus, Focus::Error);
-        // let [content, _] =
-        //     Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
+        let [content, _] =
+            Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
 
-        // let [connections, _viewer] =
-        //     Layout::horizontal([Constraint::Percentage(15), Constraint::Min(1)]).areas(content);
+        let error = Popup::new(self.message.as_ref()).style(Style::new().red().on_black());
 
-        // let [_, results] =
-        //     Layout::vertical([Constraint::Percentage(7), Constraint::Percentage(93)]).areas(area);
-        let list = self
-            .results
-            .clone()
-            .block(
-                Block::bordered()
-                    .title("Connection Results Filtered")
-                    .border_style(if focused {
-                        Style::new().blue()
-                    } else {
-                        Style::default()
-                    }),
-            )
-            .style(Style::new().bg(Color::Black))
-            .highlight_style(if focused {
-                Style::new()
-                    .fg(Color::Black)
-                    .bg(Color::LightGreen)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            })
-            .repeat_highlight_symbol(true)
-            .direction(ListDirection::TopToBottom);
+        if focused {
+            frame.render_widget(&error, content);
+        }
+        Ok(())
+    }
 
-        frame.render_stateful_widget(list, area, &mut self.state);
+    fn report_error(&mut self, message: String) -> Result<(), String> {
+        self.message = [message, "Press any key to continue".to_string()].join(" -- ");
         Ok(())
     }
 
@@ -69,18 +50,11 @@ impl Component for ErrorComponent {
 
     fn handle_key_event(
         &mut self,
-        key_event: crossterm::event::KeyEvent,
+        _key_event: crossterm::event::KeyEvent,
         focus: Focus,
     ) -> Result<Option<crate::action::Action>, String> {
-        let key: Key = key_event.into();
         match focus {
-            Focus::ConnectionFilterResults => {
-                if key == self.config.key_config.exit {
-                    Ok(Some(Action::Quit))
-                } else {
-                    Ok(Some(Action::Nothing))
-                }
-            }
+            Focus::Error => Ok(Some(Action::ChangeFocus(Focus::Connections))),
             _ => Ok(None),
         }
     }

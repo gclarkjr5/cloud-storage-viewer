@@ -166,20 +166,11 @@ impl Component for Footer {
                 )
             }
             Focus::Error => {
-                let filter_commands = vec![
-                    "Up=".into(),
-                    "[k/Up Arrow] ".blue(),
-                    "Down=".into(),
-                    "[j/Down Arrow] ".blue(),
-                    "Switch to Filter=".into(),
-                    "[Tab] ".blue(),
-                    "Select Result=".into(),
-                    "[Enter] ".blue(),
-                ];
-                Paragraph::new(Line::from(filter_commands)).block(
+                let error_commands = vec!["Press any key to continue".into()];
+                Paragraph::new(Line::from(error_commands)).block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Filter Results Commands")
+                        .title("Error Commands")
                         .style(Style::default()),
                 )
             }

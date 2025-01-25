@@ -1,7 +1,7 @@
 use cloud_config::CloudConfig;
 use key_config::KeyConfig;
 
-use std::io::Result;
+use std::result::Result;
 pub mod cloud_config;
 pub mod key_config;
 
@@ -12,8 +12,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn init(&mut self) -> Result<()> {
-        // self.key_config.init()?;
+    pub fn init(&mut self) -> Result<(), String> {
         self.cloud_config.init()?;
         Ok(())
     }

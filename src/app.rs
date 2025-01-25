@@ -70,7 +70,12 @@ impl App {
             // after drawing, handle terminal events
             match self.handle_events()? {
                 Action::Quit => break,
-                Action::Error(message) => self.report_error(message),
+                Action::Error(message) => {
+                    for component in self.components.iter_mut() {
+                        component.report_error(message.clone())?;
+                    }
+                    self.change_focus(Focus::Error);
+                }
                 Action::ChangeFocus(focus) => self.change_focus(focus),
                 Action::ListCloudProvider(cloud_config) => {
                     self.config.cloud_config = cloud_config;
@@ -121,15 +126,23 @@ impl App {
     }
 
     fn handle_events(&mut self) -> Result<Action, String> {
-        if crossterm::event::poll(Duration::from_millis(250))? {
-            match crossterm::event::read()? {
-                Event::Key(key) => self.handle_key_events(key),
-                Event::Mouse(mouse) => self.handle_mouse_events(mouse),
-                Event::Resize(_, _) => Ok(Action::Nothing),
-                _ => Ok(Action::Quit),
+        match crossterm::event::poll(Duration::from_millis(250)) {
+            Ok(_) => match crossterm::event::read() {
+                Ok(event) => match event {
+                    Event::Key(key) => self.handle_key_events(key),
+                    Event::Mouse(mouse) => self.handle_mouse_events(mouse),
+                    Event::Resize(_, _) => Ok(Action::Nothing),
+                    _ => Ok(Action::Quit),
+                },
+                Err(_) => {
+                    let message = "Error reading events".to_string();
+                    Err(message)
+                }
+            },
+            Err(_) => {
+                let message = "Error polling for events".to_string();
+                Err(message)
             }
-        } else {
-            Ok(Action::Nothing)
         }
     }
 
@@ -166,20 +179,19 @@ impl App {
         self.focus = focus;
     }
 
-    pub fn report_error(&mut self, message: String) {
-        for component in self.components.iter_mut() {
-            component.report_error(message.clone());
-        }
-    }
-
     pub fn render(&mut self, tui: &mut Tui) -> Result<(), String> {
-        tui.terminal.draw(|frame| {
+        match tui.terminal.draw(|frame| {
             for component in self.components.iter_mut() {
                 if let Err(err) = component.draw(frame, frame.area(), self.focus) {
                     eprintln!("Failed to draw: {:?}", err);
                 }
             }
-        })?;
-        Ok(())
+        }) {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                let message = "Error drawing to terminal".to_string();
+                Err(message)
+            }
+        }
     }
 }

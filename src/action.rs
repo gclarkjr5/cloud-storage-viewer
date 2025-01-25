@@ -10,4 +10,5 @@ pub enum Action {
     Nothing,
     ActivateConfig(Vec<String>),
     SelectFilteredItem(String, Focus),
+    Error(String),
 }
