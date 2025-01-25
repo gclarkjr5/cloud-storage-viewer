@@ -1,7 +1,10 @@
+use std::sync::Arc;
 use std::{io::BufRead, io::Result, process::Command};
 
 use crossterm::event::{KeyEvent, MouseEventKind};
 use ego_tree::{NodeId, NodeRef, Tree as ETree};
+use nucleo::pattern::{CaseMatching, Normalization};
+use nucleo::{Config as NucleoConfig, Nucleo};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::Span;
@@ -255,6 +258,7 @@ impl Component for Viewer {
                     // activate filter
                     self.filter.active = !self.filter.active;
                     Ok(Some(Action::ChangeFocus(Focus::ViewerFilter)))
+                    // Ok(Some(Action::Nothing))
                 } else {
                     Ok(Some(Action::Nothing))
                 }
@@ -265,19 +269,84 @@ impl Component for Viewer {
                     None => Ok(Some(Action::Nothing)),
                     Some(action) => match action {
                         Action::Filter(txt) => {
-                            let t = txt.last().unwrap();
+                            let search_term = txt.last().unwrap();
                             self.filter.filtered_results.items = self
                                 .tree
                                 .nodes()
-                                .filter(|n| n.value().contains(t) && n.value().contains('/'))
+                                .filter(|n| n.value().contains('/'))
                                 .map(|n| n.value().to_string())
                                 .collect();
+
+                            let number_of_columns = 1;
+
+                            let mut nucleo = Nucleo::new(
+                                NucleoConfig::DEFAULT,
+                                Arc::new(|| {}),
+                                None,
+                                number_of_columns,
+                            );
+
+                            // Send the strings to search through to the matcher
+                            let injector = nucleo.injector();
+
+                            for (id, string) in self
+                                .filter
+                                .filtered_results
+                                .items
+                                .clone()
+                                .iter()
+                                .enumerate()
+                            {
+                                // Only the strings assigned to row in the closure below are matched on,
+                                // so it's possible to pass an identifier in.
+                                let item = (id, string.to_owned());
+
+                                injector.push(item, |(_id, string), row| {
+                                    // The size of this array is determined by number_of_columns
+                                    let str_clone = string.clone();
+                                    row[0] = str_clone.into()
+                                });
+                            }
+
+                            // The search is initialised here...
+
+                            nucleo.pattern.reparse(
+                                0,
+                                search_term,
+                                CaseMatching::Ignore,
+                                Normalization::Smart,
+                                false,
+                            );
+
+                            // ...but actually begins here
+                            let _status = nucleo.tick(500);
+                            // if status.changed {
+                            //     println!("There are new results.")
+                            // }
+                            // if !status.running {
+                            //     println!("The search has finished.")
+                            // }
+
+                            // Snapshot contains the current set of results
+                            let snapshot = nucleo.snapshot();
+
+                            // Matching items are returned, ranked by highest score first.
+                            // These are just the items as pushed to the injector earlier.
+                            let matches: Vec<_> = snapshot.matched_items(..).collect();
+
+                            let mut data_list: Vec<String> = vec![];
+                            for item in matches {
+                                let (_, data) = item.data;
+
+                                data_list.push(data.to_string());
+                            }
+                            self.filter.filtered_results.filtered_items = data_list.clone();
                             self.filter.filtered_results.results = self
                                 .filter
                                 .filtered_results
                                 .results
                                 .clone()
-                                .items(self.filter.filtered_results.items.clone());
+                                .items(self.filter.filtered_results.filtered_items.clone());
                             Ok(None)
                         }
                         _ => Ok(Some(action)),

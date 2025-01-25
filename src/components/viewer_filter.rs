@@ -73,7 +73,7 @@ impl Component for ViewerFilter {
             Focus::ViewerFilter => {
                 if key == self.config.key_config.exit {
                     Ok(Some(Action::Quit))
-                } else if key == self.config.key_config.filter {
+                } else if key == self.config.key_config.close_component {
                     self.active = !self.active;
                     Ok(Some(Action::ChangeFocus(Focus::Viewer)))
                 } else if matches!(key, Key::Char(_))

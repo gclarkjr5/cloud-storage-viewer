@@ -11,6 +11,7 @@ use super::Component;
 pub struct ConnectionFilterResults {
     pub config: Config,
     pub items: Vec<String>,
+    pub filtered_items: Vec<String>,
     pub results: List<'static>,
     pub state: ListState,
 }
@@ -80,8 +81,8 @@ impl Component for ConnectionFilterResults {
                     Ok(Some(Action::Quit))
                 } else if key == self.config.key_config.enter {
                     let item_idx = self.state.selected().unwrap();
-                    let item = self.items[item_idx].clone();
-                    Ok(Some(Action::SelectFilteredItem(item, Focus::Connections)))
+                    let item = self.filtered_items[item_idx].clone();
+                    Ok(Some(Action::SelectFilteredItem(item, Focus::Viewer)))
                 } else if [
                     self.config.key_config.key_up,
                     self.config.key_config.arrow_up,

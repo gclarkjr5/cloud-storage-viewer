@@ -65,7 +65,7 @@ impl Component for Footer {
                     "Activate Account=".into(),
                     "[a] ".blue(),
                     "Open Filter=".into(),
-                    "[Ctrl+f]".blue(),
+                    "[/]".blue(),
                 ];
                 Paragraph::new(Line::from(connection_commands)).block(
                     Block::default()
@@ -81,7 +81,7 @@ impl Component for Footer {
                     "List Items=".into(),
                     "[Enter] ".blue(),
                     "Open Filter=".into(),
-                    "[Ctrl+f]".blue(),
+                    "[/]".blue(),
                 ];
                 if self.results_pager.num_pages > 1 {
                     viewer_commands.push("Next Page=".into());
@@ -100,8 +100,8 @@ impl Component for Footer {
                 let filter_commands = vec![
                     "Switch to Results=".into(),
                     "[Enter/Tab] ".blue(),
-                    "Close Filter=".into(),
-                    "[Ctrl+f] ".blue(),
+                    "Close Filtering=".into(),
+                    "[Esc] ".blue(),
                 ];
                 Paragraph::new(Line::from(filter_commands)).block(
                     Block::default()
@@ -132,8 +132,8 @@ impl Component for Footer {
                 let filter_commands = vec![
                     "Switch to Results=".into(),
                     "[Enter/Tab] ".blue(),
-                    "Close Filter=".into(),
-                    "[Ctrl+f] ".blue(),
+                    "Close Filtering=".into(),
+                    "[Esc] ".blue(),
                 ];
                 Paragraph::new(Line::from(filter_commands)).block(
                     Block::default()
