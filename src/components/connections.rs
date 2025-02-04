@@ -52,6 +52,24 @@ impl Connections {
         }
     }
 
+    fn verify_implemented_cloud_provider(
+        &self,
+        selected: Vec<String>,
+    ) -> Result<CloudProvider, Action> {
+        let cloud_provider: CloudProvider = selected[1].clone().into();
+        match cloud_provider {
+            CloudProvider::Azure(_) => {
+                let message = format!("{} is not implemented yet", cloud_provider);
+                Err(Action::Error(message))
+            }
+            CloudProvider::Gcs(_) => Ok(cloud_provider),
+            CloudProvider::S3(_) => {
+                let message = format!("{} is not implemented yet", cloud_provider);
+                Err(Action::Error(message))
+            }
+        }
+    }
+
     pub fn list_cloud_provider(
         &mut self,
         selection: Vec<String>,
@@ -180,7 +198,6 @@ impl Component for Connections {
             _ => Ok(Action::Nothing),
         }
     }
-
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
         let key: Key = key_event.into();
         match focus {
@@ -239,6 +256,7 @@ impl Component for Connections {
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.activate_connection {
                     let selected = self.state.selected().to_vec();
+                    let cloud_provider = self.verify_implemented_cloud_provider(selected)?;
 
                     // first is the root, second is the cloud provider
                     if selected.len() < 3 {
@@ -259,6 +277,28 @@ impl Component for Connections {
                     }
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
+                    let cloud_provider = self.verify_implemented_cloud_provider(selected)?;
+
+                    self.config.cloud_config.list_config(cloud_provider.clone());
+                    self.list_cloud_provider(selected, focus)
+                        .expect("error list cloud providers");
+                    Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
+                    // match cloud_provider {
+                    //     CloudProvider::Azure(_) => {
+                    //         let message = format!("{} is not implemented yet", cloud_provider);
+                    //         Ok(Action::Error(message))
+                    //     }
+                    //     CloudProvider::Gcs(_) => {
+                    //         self.config.cloud_config.list_config(cloud_provider.clone());
+                    //         self.list_cloud_provider(selected, focus)
+                    //             .expect("error list cloud providers");
+                    //         Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
+                    //     }
+                    //     CloudProvider::S3(_) => {
+                    //         let message = format!("{} is not implemented yet", cloud_provider);
+                    //         Ok(Action::Error(message))
+                    //     }
+                    // }
 
                     if selected.len() == 2 {
                         // listing a cloud provider

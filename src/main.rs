@@ -1,3 +1,8 @@
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(unused_must_use)]
+
 use logging::initialize_logging;
 use std::result::Result;
 
@@ -13,10 +18,12 @@ mod util;
 use crate::app::App;
 
 fn main() -> Result<(), String> {
-    initialize_logging().expect("error initializing logging");
-
-    let mut app = App::new();
-    app.run()?;
-
-    Ok(())
+    match initialize_logging() {
+        Ok(_) => {
+            let mut app = App::new();
+            app.run()?;
+            Ok(())
+        }
+        Err(_) => Err("error initializing logging".to_string()),
+    }
 }
