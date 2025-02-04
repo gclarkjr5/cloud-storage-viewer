@@ -52,11 +52,6 @@ impl App {
         tui.enter()?;
         tui.clear()?;
 
-        // regisration
-        // for component in self.components.iter_mut() {
-        //     component.register_action_handler(self.action_tx.clone())?;
-        // }
-        self.config.init()?;
         for component in self.components.iter_mut() {
             component.register_config(self.config.clone(), self.focus)?;
             component.init()?;
@@ -68,7 +63,7 @@ impl App {
             self.render(&mut tui)?;
 
             // after drawing, handle terminal events
-            match self.handle_events()? {
+            match self.handle_events().unwrap() {
                 Action::Quit => break,
                 Action::Error(message) => {
                     for component in self.components.iter_mut() {
@@ -125,7 +120,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_events(&mut self) -> Result<Action, String> {
+    fn handle_events(&mut self) -> Result<Action, Action> {
         match crossterm::event::poll(Duration::from_millis(250)) {
             Ok(_) => match crossterm::event::read() {
                 Ok(event) => match event {
@@ -136,37 +131,37 @@ impl App {
                 },
                 Err(_) => {
                     let message = "Error reading events".to_string();
-                    Err(message)
+                    Err(Action::Error(message))
                 }
             },
             Err(_) => {
                 let message = "Error polling for events".to_string();
-                Err(message)
+                Err(Action::Error(message))
             }
         }
     }
 
-    fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action, String> {
+    fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action, Action> {
         // convert key event into Key
         // let key: Key = key_event.into();
-
         let mut res = Action::Nothing;
         // handle event for components
         for component in self.components.iter_mut() {
-            let act = component.handle_key_event(key_event, self.focus)?;
-            if act
-                .clone()
-                .is_some_and(|a| matches!(a, Action::ActivateConfig(_selection)))
-            {
-                res = act.unwrap();
-            } else if act.is_some() {
-                res = act.unwrap()
-            }
+            res = component.handle_key_event(key_event, self.focus)?;
+            println!("the res is: {:?}", res);
+
+            // let act = component.handle_key_event(key_event, self.focus)?;
+            // if matches!(act, Action::ActivateConfig(_selection)) {
+            //     res = act
+            // } else if act {
+            //     res = act.unwrap()
+            // }
         }
+
         Ok(res)
     }
 
-    fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action, String> {
+    fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action, Action> {
         let res = Action::Nothing;
         // handle event for components
         for component in self.components.iter_mut() {

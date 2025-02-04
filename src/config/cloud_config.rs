@@ -40,13 +40,6 @@ impl Default for CloudConfig {
 }
 
 impl CloudConfig {
-    pub fn init(&mut self) -> Result<(), String> {
-        for cloud_provider in self.cloud_providers.iter_mut() {
-            cloud_provider.init()
-        }
-        Ok(())
-    }
-
     pub fn set_active_cloud(&mut self, cloud_provider: CloudProvider) {
         self.cloud_providers
             .iter()
@@ -104,7 +97,7 @@ impl CloudConfig {
             .iter_mut()
             .for_each(|cp| match (cp.clone(), &cloud_provider) {
                 (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
-                (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => cp.init(),
+                (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => cp.update().unwrap(),
                 (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
                 _ => (),
             });
@@ -126,15 +119,15 @@ impl Default for CloudProvider {
 }
 
 trait CloudProviderInit {
-    fn init(&mut self);
+    fn update(&mut self) -> Result<(), String>;
     fn get_active_config(&self) -> String;
     fn activate_new_config(&self, new_connection: String);
 }
 
 impl CloudProviderInit for CloudProvider {
-    fn init(&mut self) {
+    fn update(&mut self) -> Result<(), String> {
         match self {
-            Self::Azure(_) => (),
+            Self::Azure(_) => Err("Azure not implemented".to_string()),
             Self::Gcs(config) => {
                 config.clear();
                 Command::new("gcloud")
@@ -160,8 +153,9 @@ impl CloudProviderInit for CloudProvider {
 
                         config.push(conf);
                     });
+                Ok(())
             }
-            Self::S3(_) => (),
+            Self::S3(_) => Err("S3 not implemented".to_string()),
         }
     }
     fn get_active_config(&self) -> String {

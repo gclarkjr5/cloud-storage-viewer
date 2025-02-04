@@ -28,26 +28,25 @@ impl Tui {
     pub fn new() -> Result<Self, String> {
         let terminal = ratatui::Terminal::new(Backend::new(stdout()));
 
-        if terminal.is_ok() {
-            Ok(Self {
-                terminal: terminal.unwrap(),
-            })
-        } else {
-            let message = format!("Error attaching a new Ratatui terminal");
-            Err(message)
+        match terminal {
+            Ok(term) => Ok(Self { terminal: term }),
+            Err(_) => {
+                let message = "Error attaching a new Ratatui terminal".to_string();
+                Err(message)
+            }
         }
     }
 
     pub fn enter(&mut self) -> Result<(), String> {
-        if crossterm::terminal::enable_raw_mode().is_ok() {
-            crossterm::terminal::enable_raw_mode().unwrap()
+        match crossterm::terminal::enable_raw_mode() {
+            Ok(_) => {
+                match crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture) {
+                    Ok(e) => Ok(e),
+                    Err(_) => Err("error executing the terminal".to_string()),
+                }
+            }
+            Err(_) => Err("error enabling terminal raw mode".to_string()),
         }
-
-        if crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture,).is_ok() {
-            crossterm::execute!(stdout(), EnterAlternateScreen, EnableMouseCapture,).unwrap()
-        }
-
-        Ok(())
     }
 
     pub fn exit(&mut self) -> Result<(), String> {
@@ -79,12 +78,12 @@ impl Tui {
     }
 
     pub fn clear(&mut self) -> Result<(), String> {
-        if self.terminal.clear().is_ok() {
-            self.terminal.clear().unwrap();
-            Ok(())
-        } else {
-            let message = format!("Error clearing terminal");
-            Err(message)
+        match self.terminal.clear() {
+            Ok(t) => Ok(t),
+            Err(_) => {
+                let message = "Error clearing terminal".to_string();
+                Err(message)
+            }
         }
     }
 }

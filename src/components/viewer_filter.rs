@@ -20,11 +20,6 @@ pub struct ViewerFilter {
 }
 
 impl Component for ViewerFilter {
-    fn init(&mut self) -> Result<(), String> {
-        self.filtered_results.init()?;
-        Ok(())
-    }
-
     fn draw(
         &mut self,
         frame: &mut ratatui::Frame,
@@ -68,15 +63,15 @@ impl Component for ViewerFilter {
         &mut self,
         key_event: KeyEvent,
         focus: crate::app::Focus,
-    ) -> Result<Option<Action>, String> {
+    ) -> Result<Action, Action> {
         let key: Key = key_event.into();
         match focus {
             Focus::ViewerFilter => {
                 if key == self.config.key_config.exit {
-                    Ok(Some(Action::Quit))
+                    Ok(Action::Quit)
                 } else if key == self.config.key_config.close_component {
                     self.active = !self.active;
-                    Ok(Some(Action::ChangeFocus(Focus::Viewer)))
+                    Ok(Action::ChangeFocus(Focus::Viewer))
                 } else if matches!(key, Key::Char(_))
                     || [
                         self.config.key_config.backspace,
@@ -90,7 +85,7 @@ impl Component for ViewerFilter {
                     .any(|kc| kc == &key)
                 {
                     self.textarea.input(key_event);
-                    Ok(Some(Action::Filter(self.textarea.clone().into_lines())))
+                    Ok(Action::Filter(self.textarea.clone().into_lines()))
                 } else if [
                     self.config.key_config.enter,
                     self.config.key_config.change_focus,
@@ -98,19 +93,18 @@ impl Component for ViewerFilter {
                 .iter()
                 .any(|kc| kc == &key)
                 {
-                    Ok(Some(Action::ChangeFocus(Focus::ViewerFilterResults)))
+                    Ok(Action::ChangeFocus(Focus::ViewerFilterResults))
                 } else {
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 }
             }
-            _ => Ok(None),
+            _ => Ok(Action::Nothing),
         }
     }
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
         self.filtered_results
-            .register_config(self.config.clone(), focus)?;
-        Ok(())
+            .register_config(self.config.clone(), focus)
     }
 }

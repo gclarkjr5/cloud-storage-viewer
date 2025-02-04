@@ -21,23 +21,19 @@ pub trait Component {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<(), String>;
 
-    fn handle_key_event(
-        &mut self,
-        key_event: KeyEvent,
-        focus: Focus,
-    ) -> Result<Option<Action>, String> {
+    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
         let _key_event = key_event;
         let _foucs = focus;
-        Ok(None)
+        Ok(Action::Nothing)
     }
     fn handle_mouse_event(
         &mut self,
         mouse_event: MouseEvent,
         focus: Focus,
-    ) -> Result<Option<Action>, String> {
+    ) -> Result<Action, Action> {
         let _mouse_event = mouse_event;
         let _foucs = focus;
-        Ok(None)
+        Ok(Action::Nothing)
     }
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
     fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<(), String> {
