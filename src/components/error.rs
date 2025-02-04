@@ -55,7 +55,7 @@ impl Component for ErrorComponent {
     ) -> Result<Action, Action> {
         match focus {
             Focus::Error => Ok(Action::ChangeFocus(Focus::Connections)),
-            _ => Ok(Action::Nothing),
+            _ => Ok(Action::Skip),
         }
     }
 }

@@ -24,7 +24,7 @@ pub trait Component {
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
         let _key_event = key_event;
         let _foucs = focus;
-        Ok(Action::Nothing)
+        Ok(Action::Skip)
     }
     fn handle_mouse_event(
         &mut self,

@@ -93,7 +93,7 @@ impl Component for ConnectionFilter {
                     Ok(Action::Nothing)
                 }
             }
-            _ => Ok(Action::Nothing),
+            _ => Ok(Action::Skip),
         }
     }
 

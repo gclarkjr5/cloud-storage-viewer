@@ -100,7 +100,7 @@ impl Component for ConnectionFilterResults {
                     Ok(Action::Nothing)
                 }
             }
-            _ => Ok(Action::Nothing),
+            _ => Ok(Action::Skip),
         }
     }
 }

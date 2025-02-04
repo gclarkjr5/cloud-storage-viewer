@@ -351,7 +351,7 @@ impl Component for Viewer {
                 .filter
                 .filtered_results
                 .handle_key_event(key_event, focus),
-            _ => Ok(Action::Nothing),
+            _ => Ok(Action::Skip),
         }
     }
 

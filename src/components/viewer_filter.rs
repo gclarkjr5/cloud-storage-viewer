@@ -98,7 +98,7 @@ impl Component for ViewerFilter {
                     Ok(Action::Nothing)
                 }
             }
-            _ => Ok(Action::Nothing),
+            _ => Ok(Action::Skip),
         }
     }
 

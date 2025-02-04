@@ -100,6 +100,7 @@ impl App {
                 }
                 Action::Nothing => (),
                 Action::Filter(_) => (),
+                Action::Skip => (),
             };
             // if self
             //     .handle_events()
@@ -143,22 +144,18 @@ impl App {
 
     fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action, Action> {
         // convert key event into Key
-        // let key: Key = key_event.into();
-        let mut res = Action::Nothing;
+        let mut act = Action::Nothing;
+
         // handle event for components
         for component in self.components.iter_mut() {
-            res = component.handle_key_event(key_event, self.focus)?;
-            println!("the res is: {:?}", res);
+            let res = component.handle_key_event(key_event, self.focus)?;
 
-            // let act = component.handle_key_event(key_event, self.focus)?;
-            // if matches!(act, Action::ActivateConfig(_selection)) {
-            //     res = act
-            // } else if act {
-            //     res = act.unwrap()
-            // }
+            if !matches!(res, Action::Skip) {
+                act = res
+            }
         }
 
-        Ok(res)
+        Ok(act)
     }
 
     fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action, Action> {

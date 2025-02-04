@@ -8,6 +8,7 @@ pub enum Action {
     Filter(Vec<String>),
     ChangeFocus(Focus),
     Nothing,
+    Skip,
     ActivateConfig(Vec<String>),
     SelectFilteredItem(String, Focus),
     Error(String),

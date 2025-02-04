@@ -100,7 +100,7 @@ impl Component for ViewerFilterResults {
                     Ok(Action::Nothing)
                 }
             }
-            _ => Ok(Action::Nothing),
+            _ => Ok(Action::Skip),
         }
     }
 }
