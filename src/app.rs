@@ -63,44 +63,56 @@ impl App {
             self.render(&mut tui)?;
 
             // after drawing, handle terminal events
-            match self.handle_events().unwrap() {
-                Action::Quit => break,
-                Action::Error(message) => {
-                    for component in self.components.iter_mut() {
-                        component.report_error(message.clone())?;
+            match self.handle_events() {
+                Ok(act) => match act {
+                    Action::Quit => break,
+                    // Action::Error(message) => {
+                    //     for component in self.components.iter_mut() {
+                    //         component.report_error(message.clone())?;
+                    //     }
+                    //     self.change_focus(Focus::Error);
+                    // }
+                    Action::ChangeFocus(focus) => self.change_focus(focus),
+                    Action::ListCloudProvider(cloud_config) => {
+                        self.config.cloud_config = cloud_config;
+                        for component in self.components.iter_mut() {
+                            component.register_config(self.config.clone(), self.focus)?;
+                        }
                     }
-                    self.change_focus(Focus::Error);
-                }
-                Action::ChangeFocus(focus) => self.change_focus(focus),
-                Action::ListCloudProvider(cloud_config) => {
-                    self.config.cloud_config = cloud_config;
-                    for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone(), self.focus)?;
+                    Action::ListConfiguration(cloud_config, selection, buckets) => {
+                        self.config.cloud_config = cloud_config;
+                        self.change_focus(Focus::Viewer);
+                        for component in self.components.iter_mut() {
+                            component.register_config(self.config.clone(), self.focus)?;
+                            component.list_items(buckets.clone(), selection.clone(), self.focus)?;
+                        }
                     }
-                }
-                Action::ListConfiguration(cloud_config, selection, buckets) => {
-                    self.config.cloud_config = cloud_config;
-                    self.change_focus(Focus::Viewer);
-                    for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone(), self.focus)?;
-                        component.list_items(buckets.clone(), selection.clone(), self.focus)?;
+                    Action::ActivateConfig(selection) => {
+                        self.config.cloud_config.activate_config(selection)?;
+                        for component in self.components.iter_mut() {
+                            component.register_config(self.config.clone(), self.focus)?;
+                        }
                     }
-                }
-                Action::ActivateConfig(selection) => {
-                    self.config.cloud_config.activate_config(selection)?;
-                    for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone(), self.focus)?;
+                    Action::SelectFilteredItem(item, focus) => {
+                        self.change_focus(focus);
+                        for component in self.components.iter_mut() {
+                            component.select_item(&item, self.focus)?;
+                        }
                     }
-                }
-                Action::SelectFilteredItem(item, focus) => {
-                    self.change_focus(focus);
-                    for component in self.components.iter_mut() {
-                        component.select_item(&item, self.focus)?;
+                    _ => (), // Action::Nothing => (),
+                             // Action::Filter(_) => (),
+                             // Action::Skip => (),
+                             // Action::Error(_) => (),
+                },
+                Err(act) => match act {
+                    Action::Error(message) => {
+                        for component in self.components.iter_mut() {
+                            component.report_error(message.clone())?;
+                        }
+                        self.change_focus(Focus::Error);
                     }
-                }
-                Action::Nothing => (),
-                Action::Filter(_) => (),
-                Action::Skip => (),
+                    _ => break,
+                },
             };
             // if self
             //     .handle_events()
