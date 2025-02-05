@@ -3,6 +3,8 @@ use std::io::BufRead;
 use std::process::Command;
 use std::result::Result;
 
+use crate::action::Action;
+
 #[derive(Debug, Clone)]
 pub struct CloudConfig {
     pub cloud_providers: Vec<CloudProvider>,
@@ -40,6 +42,27 @@ impl Default for CloudConfig {
 }
 
 impl CloudConfig {
+    pub fn verify_implemented_cloud_provider(
+        &self,
+        selected: Vec<String>,
+    ) -> Result<CloudProvider, Action> {
+        let cloud_provider: CloudProvider = selected[1].clone().into();
+        match cloud_provider {
+            CloudProvider::Azure(_) => {
+                let message = format!("{} is not implemented yet", cloud_provider);
+                Err(Action::Error(message))
+            }
+            CloudProvider::Gcs(_) => {
+                cloud_provider.check_cli_tools();
+                Ok(cloud_provider)
+            }
+            CloudProvider::S3(_) => {
+                let message = format!("{} is not implemented yet", cloud_provider);
+                Err(Action::Error(message))
+            }
+        }
+    }
+
     pub fn set_active_cloud(&mut self, cloud_provider: CloudProvider) {
         self.cloud_providers
             .iter()
@@ -118,13 +141,27 @@ impl Default for CloudProvider {
     }
 }
 
-trait CloudProviderInit {
+pub trait CloudProviderInit {
     fn update(&mut self) -> Result<(), String>;
     fn get_active_config(&self) -> String;
     fn activate_new_config(&self, new_connection: String);
+    fn check_cli_tools(&self) -> Result<(), Action>;
 }
 
 impl CloudProviderInit for CloudProvider {
+    fn check_cli_tools(&self) -> Result<(), Action> {
+        match self {
+            Self::Azure(_) => Err(Action::Error("Azure not implemented".to_string())),
+            Self::Gcs(_) => {
+                if let Err(_) = Command::new("gcloud").arg("--version").output() {
+                    Err(Action::Error("gcloud not installed".to_string()))
+                } else {
+                    Ok(())
+                }
+            }
+            Self::S3(_) => Err(Action::Error("S3 not implemented".to_string())),
+        }
+    }
     fn update(&mut self) -> Result<(), String> {
         match self {
             Self::Azure(_) => Err("Azure not implemented".to_string()),
