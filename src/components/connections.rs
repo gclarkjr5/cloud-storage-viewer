@@ -19,7 +19,7 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::action::Action;
 use crate::app::Focus;
-use crate::config::cloud_config::CloudProvider;
+use crate::config::cloud_config::{CloudProvider, CloudProviderInit};
 use crate::config::Config;
 use crate::key::Key;
 use crate::util;
@@ -56,42 +56,98 @@ impl Connections {
         &mut self,
         selection: Vec<String>,
         focus: Focus,
-    ) -> Result<(), String> {
-        let cloud_provider: CloudProvider = selection[1].clone().into();
-        // find the node to append to
-        let found_node = self.find_node_to_append(cloud_provider.clone().into());
-
-        // if empty dont do anything
-        if found_node.is_none() {
-            return Ok(());
-        }
-        let (_selected, node_to_append_to) = found_node.unwrap();
-
-        self.config
+    ) -> Result<Action, Action> {
+        let mut cloud_provider = self
+            .config
             .cloud_config
-            .cloud_providers
-            .iter()
-            .for_each(|cp| match (cp, &cloud_provider) {
-                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
-                (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
-                    configs.iter().for_each(|config| {
-                        let res = format!("{}/{}", cp, config.name.clone());
+            .verify_implemented_cloud_provider(&selection)?;
 
-                        self.tree
-                            .get_mut(node_to_append_to)
-                            .expect("error getting mutable node")
-                            .append(res);
-                    });
-                }
-                (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
-                _ => (),
-            });
+        // find the node to append to
+        let found_node = self.find_node_to_append(&cloud_provider.clone().into())?;
+
+        // cloud_provider.create_nodes();
+        // if empty dont do anything
+        // let cpr: CloudProvider = selection[1].clone().into();
+        match found_node {
+            None => Ok(Action::Nothing),
+            Some(nid) => {
+                cloud_provider.update().unwrap();
+                cloud_provider.create_nodes(&mut self.tree, nid)?;
+                self.items =
+                    util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+                self.state.open(selection.clone());
+                Ok(Action::Nothing)
+
+                // let o = self
+                //     .config
+                //     .cloud_config
+                //     .cloud_providers
+                //     .iter()
+                //     .find_map(|cp| match (cp, &cloud_provider) {
+                //         (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
+                //             Some(Action::Error("Azure not implemented".to_string()))
+                //         }
+                //         (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
+                //             configs.iter().for_each(|config| {
+                //                 let res = format!("{}/{}", cp, config.name.clone());
+
+                //                 self.tree
+                //                     .get_mut(nid)
+                //                     .expect("error getting mutable node")
+                //                     .append(res);
+                //             });
+                //         }
+                //         (CloudProvider::S3(_), CloudProvider::S3(_)) => {
+                //             Some(Action::Error("S3 not implemented".to_string()))
+                //         }
+                //         _ => Some(Action::Nothing),
+                //     });
+
+                // match o {
+                //     Some(action) => Ok(action),
+                //     None => Err(Action::Error("error".to_string())),
+                // }
+            }
+        }
+        // let found_node = self.find_node_to_append(&cloud_provider.clone().into())?;
+
+        // match found_node {
+        //     None => {
+        //         // This node already has been requested, would you like to refresh it?
+        //         Err(Action::Error(
+        //             "Refreshing nodes that have already been requested is currently not implemented"
+        //                 .to_string(),
+        //         ))
+        //     }
+        //     Some(node_id) => {
+        //         let matched_cloud_provider_configs =
+        //             self.config.cloud_config.find_provider(cloud_provider)?;
+
+        //         matched_cloud_provider_configs.iter().for_each(|config| {
+        //             let res = config.get_name();
+
+        //             self.tree
+        //                 .get_mut(node_id)
+        //                 .expect("error getting mutable node")
+        //                 .append(res);
+        //         });
+
+        //         // convert tree into tree widget items
+        //         self.items =
+        //             util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+        //         self.state.open(selection);
+
+        //         Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
+        //     }
+        // }
+        // if found_node.is_none() {
+        //     return Ok(());
+        // }
+        // let (_selected, node_to_append_to) = found_node.unwrap();
 
         // convert tree into tree widget items
-        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-        self.state.open(selection);
 
-        Ok(())
+        // Ok(())
     }
 
     pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Vec<u8>, String> {
@@ -103,21 +159,38 @@ impl Connections {
         Ok(output)
     }
 
-    pub fn find_node_to_append(&mut self, path_identifier: String) -> Option<(String, NodeId)> {
+    pub fn find_node_to_append(
+        &mut self,
+        path_identifier: &String,
+    ) -> Result<Option<NodeId>, Action> {
         let found_node = self
             .tree
             .nodes()
-            .find(|node| node.value() == &path_identifier);
+            .find(|node| node.value() == path_identifier);
 
-        found_node?;
-
-        let node = found_node.expect("error unwrapping found node");
-
-        if node.has_children() {
-            return None;
+        match found_node {
+            Some(node) if node.has_children() => Ok(None),
+            Some(node) => Ok(Some(node.id())),
+            None => {
+                let message = format!("Not able to find tree item at {}", path_identifier);
+                Err(Action::Error(message))
+            }
         }
 
-        Some((path_identifier, node.id()))
+        // match found_node {
+        //     Some(nref) => {
+        //         nref.has_children()
+        //     }
+        // }
+        // found_node?;
+
+        // let node = found_node.expect("error unwrapping found node");
+
+        // if node.has_children() {
+        //     return None;
+        // }
+
+        // Some((path_identifier, node.id()))
     }
 }
 
@@ -151,8 +224,6 @@ impl Component for Connections {
         self.tree = tree;
         self.items = items;
 
-        self.filter.init()?;
-
         Ok(())
     }
 
@@ -160,34 +231,29 @@ impl Component for Connections {
         &mut self,
         mouse_event: crossterm::event::MouseEvent,
         focus: Focus,
-    ) -> Result<Option<Action>, String> {
+    ) -> Result<Action, Action> {
         match focus {
             Focus::Connections => match mouse_event.kind {
                 MouseEventKind::ScrollDown => {
                     self.state.scroll_down(1);
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 }
                 MouseEventKind::ScrollUp => {
                     self.state.scroll_up(1);
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 }
 
                 MouseEventKind::Down(_button) => {
                     self.state
                         .click_at(Position::new(mouse_event.column, mouse_event.row));
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 }
-                _ => Ok(Some(Action::Nothing)),
+                _ => Ok(Action::Nothing),
             },
-            _ => Ok(Some(Action::Nothing)),
+            _ => Ok(Action::Nothing),
         }
     }
-
-    fn handle_key_event(
-        &mut self,
-        key_event: KeyEvent,
-        focus: Focus,
-    ) -> Result<Option<Action>, String> {
+    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
         let key: Key = key_event.into();
         match focus {
             Focus::Connections => {
@@ -195,9 +261,9 @@ impl Component for Connections {
                     .iter()
                     .any(|kc| kc == &key)
                 {
-                    Ok(Some(Action::Quit))
+                    Ok(Action::Quit)
                 } else if key == self.config.key_config.change_focus {
-                    Ok(Some(Action::ChangeFocus(Focus::Viewer)))
+                    Ok(Action::ChangeFocus(Focus::Viewer))
                 } else if [
                     self.config.key_config.key_up,
                     self.config.key_config.arrow_up,
@@ -206,7 +272,7 @@ impl Component for Connections {
                 .any(|kc| kc == &key)
                 {
                     self.state.key_up();
-                    Ok(None)
+                    Ok(Action::Nothing)
                 } else if [
                     self.config.key_config.key_down,
                     self.config.key_config.arrow_down,
@@ -215,7 +281,7 @@ impl Component for Connections {
                 .any(|kc| kc == &key)
                 {
                     self.state.key_down();
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 } else if [
                     self.config.key_config.key_left,
                     self.config.key_config.arrow_left,
@@ -224,7 +290,7 @@ impl Component for Connections {
                 .any(|kc| kc == &key)
                 {
                     self.state.key_left();
-                    Ok(None)
+                    Ok(Action::Nothing)
                 } else if [
                     self.config.key_config.key_right,
                     self.config.key_config.arrow_right,
@@ -233,173 +299,197 @@ impl Component for Connections {
                 .any(|kc| kc == &key)
                 {
                     self.state.key_right();
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 } else if key == self.config.key_config.select_last {
                     self.state.select_last();
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 } else if key == self.config.key_config.select_first {
                     self.state.select_first();
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 } else if key == self.config.key_config.toggle_selected {
                     self.state.toggle_selected();
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 } else if key == self.config.key_config.activate_connection {
                     let selected = self.state.selected().to_vec();
+                    let cloud_provider = self
+                        .config
+                        .cloud_config
+                        .verify_implemented_cloud_provider(&selected)?;
 
                     // first is the root, second is the cloud provider
                     if selected.len() < 3 {
-                        Ok(Some(Action::Nothing))
+                        Ok(Action::Nothing)
                     } else {
                         let cloud_provider: CloudProvider = selected[1].clone().into();
                         match cloud_provider {
                             CloudProvider::Azure(_) => {
                                 let message = format!("{} is not implemented yet", cloud_provider);
-                                Ok(Some(Action::Error(message)))
+                                Ok(Action::Error(message))
                             }
-                            CloudProvider::Gcs(_) => Ok(Some(Action::ActivateConfig(selected))),
+                            CloudProvider::Gcs(_) => Ok(Action::ActivateConfig(selected)),
                             CloudProvider::S3(_) => {
                                 let message = format!("{} is not implemented yet", cloud_provider);
-                                Ok(Some(Action::Error(message)))
+                                Ok(Action::Error(message))
                             }
                         }
                     }
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
 
+                    // self.config.cloud_config.list_config(cloud_provider.clone());
+                    // self.list_cloud_provider(selected, focus)
+                    //     .expect("error list cloud providers");
+                    // Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
+                    // match cloud_provider {
+                    //     CloudProvider::Azure(_) => {
+                    //         let message = format!("{} is not implemented yet", cloud_provider);
+                    //         Ok(Action::Error(message))
+                    //     }
+                    //     CloudProvider::Gcs(_) => {
+                    //         self.config.cloud_config.list_config(cloud_provider.clone());
+                    //         self.list_cloud_provider(selected, focus)
+                    //             .expect("error list cloud providers");
+                    //         Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
+                    //     }
+                    //     CloudProvider::S3(_) => {
+                    //         let message = format!("{} is not implemented yet", cloud_provider);
+                    //         Ok(Action::Error(message))
+                    //     }
+                    // }
+
                     if selected.len() == 2 {
                         // listing a cloud provider
 
-                        let cloud_provider: CloudProvider = selected[1].clone().into();
-                        match cloud_provider {
-                            CloudProvider::Azure(_) => {
-                                let message = format!("{} is not implemented yet", cloud_provider);
-                                Ok(Some(Action::Error(message)))
-                            }
-                            CloudProvider::Gcs(_) => {
-                                self.config.cloud_config.list_config(cloud_provider.clone());
-                                self.list_cloud_provider(selected, focus)?;
-                                Ok(Some(Action::ListCloudProvider(
-                                    self.config.cloud_config.clone(),
-                                )))
-                            }
-                            CloudProvider::S3(_) => {
-                                let message = format!("{} is not implemented yet", cloud_provider);
-                                Ok(Some(Action::Error(message)))
-                            }
-                        }
+                        self.list_cloud_provider(selected, Focus::Connections)
+                        // match cloud_provider {
+                        //     CloudProvider::Azure(_) => {
+                        //         let message = format!("{} is not implemented yet", cloud_provider);
+                        //         Ok(Action::Error(message))
+                        //     }
+                        //     CloudProvider::Gcs(_) => {
+                        //         self.config.cloud_config.list_config(cloud_provider.clone());
+                        //         self.list_cloud_provider(selected, focus)
+                        //             .expect("error list cloud providers");
+                        //         Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
+                        //     }
+                        //     CloudProvider::S3(_) => {
+                        //         let message = format!("{} is not implemented yet", cloud_provider);
+                        //         Ok(Action::Error(message))
+                        //     }
+                        // }
                     } else if selected.len() == 3 {
                         // listing a config
-                        let buckets = self.list_configuration(selected.clone())?;
-                        Ok(Some(Action::ListConfiguration(
+                        // self.list_configuration()
+                        let buckets = self
+                            .list_configuration(selected.clone())
+                            .expect("error list configurations");
+                        Ok(Action::ListConfiguration(
                             self.config.cloud_config.clone(),
                             vec![format!("{}", self.config.cloud_config)],
                             buckets,
-                        )))
+                        ))
                     } else {
-                        Ok(Some(Action::Nothing))
+                        Ok(Action::Nothing)
                     }
                 } else if key == self.config.key_config.filter {
                     // activate filter
                     self.filter.active = !self.filter.active;
-                    Ok(Some(Action::ChangeFocus(Focus::ConnectionsFilter)))
+                    Ok(Action::ChangeFocus(Focus::ConnectionsFilter))
                 } else {
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 }
             }
             Focus::ConnectionsFilter => {
                 let action = self.filter.handle_key_event(key_event, focus)?;
                 match action {
-                    None => Ok(Some(Action::Nothing)),
-                    Some(action) => match action {
-                        Action::Filter(txt) => {
-                            let search_term = txt.last().unwrap();
-                            self.filter.filtered_results.items = self
-                                .tree
-                                .nodes()
-                                .filter(|n| n.value().contains('/'))
-                                .map(|n| n.value().to_string())
-                                .collect();
+                    Action::Filter(txt) => {
+                        let search_term = txt.last().unwrap();
+                        self.filter.filtered_results.items = self
+                            .tree
+                            .nodes()
+                            .filter(|n| n.value().contains('/'))
+                            .map(|n| n.value().to_string())
+                            .collect();
 
-                            let number_of_columns = 1;
+                        let number_of_columns = 1;
 
-                            let mut nucleo = Nucleo::new(
-                                NucleoConfig::DEFAULT,
-                                Arc::new(|| {}),
-                                None,
-                                number_of_columns,
-                            );
+                        let mut nucleo = Nucleo::new(
+                            NucleoConfig::DEFAULT,
+                            Arc::new(|| {}),
+                            None,
+                            number_of_columns,
+                        );
 
-                            // Send the strings to search through to the matcher
-                            let injector = nucleo.injector();
+                        // Send the strings to search through to the matcher
+                        let injector = nucleo.injector();
 
-                            for (id, string) in self
-                                .filter
-                                .filtered_results
-                                .items
-                                .clone()
-                                .iter()
-                                .enumerate()
-                            {
-                                // Only the strings assigned to row in the closure below are matched on,
-                                // so it's possible to pass an identifier in.
-                                let item = (id, string.to_owned());
+                        for (id, string) in self
+                            .filter
+                            .filtered_results
+                            .items
+                            .clone()
+                            .iter()
+                            .enumerate()
+                        {
+                            // Only the strings assigned to row in the closure below are matched on,
+                            // so it's possible to pass an identifier in.
+                            let item = (id, string.to_owned());
 
-                                injector.push(item, |(_id, string), row| {
-                                    // The size of this array is determined by number_of_columns
-                                    let str_clone = string.clone();
-                                    row[0] = str_clone.into()
-                                });
-                            }
-
-                            // The search is initialised here...
-                            nucleo.pattern.reparse(
-                                0,
-                                search_term,
-                                CaseMatching::Ignore,
-                                Normalization::Smart,
-                                false,
-                            );
-
-                            // ...but actually begins here
-                            let _status = nucleo.tick(500);
-                            // if status.changed {
-                            //     println!("There are new results.")
-                            // }
-                            // if !status.running {
-                            //     println!("The search has finished.")
-                            // }
-
-                            // Snapshot contains the current set of results
-                            let snapshot = nucleo.snapshot();
-
-                            // Matching items are returned, ranked by highest score first.
-                            // These are just the items as pushed to the injector earlier.
-                            let matches: Vec<_> = snapshot.matched_items(..).collect();
-
-                            let mut data_list: Vec<String> = vec![];
-                            for item in matches {
-                                let (_, data) = item.data;
-
-                                data_list.push(data.to_string());
-                            }
-                            self.filter.filtered_results.filtered_items = data_list.clone();
-                            self.filter.filtered_results.results = self
-                                .filter
-                                .filtered_results
-                                .results
-                                .clone()
-                                .items(self.filter.filtered_results.filtered_items.clone());
-                            Ok(None)
+                            injector.push(item, |(_id, string), row| {
+                                // The size of this array is determined by number_of_columns
+                                let str_clone = string.clone();
+                                row[0] = str_clone.into()
+                            });
                         }
-                        _ => Ok(Some(action)),
-                    },
+
+                        // The search is initialised here...
+                        nucleo.pattern.reparse(
+                            0,
+                            search_term,
+                            CaseMatching::Ignore,
+                            Normalization::Smart,
+                            false,
+                        );
+
+                        // ...but actually begins here
+                        let _status = nucleo.tick(500);
+                        // if status.changed {
+                        //     println!("There are new results.")
+                        // }
+                        // if !status.running {
+                        //     println!("The search has finished.")
+                        // }
+
+                        // Snapshot contains the current set of results
+                        let snapshot = nucleo.snapshot();
+
+                        // Matching items are returned, ranked by highest score first.
+                        // These are just the items as pushed to the injector earlier.
+                        let matches: Vec<_> = snapshot.matched_items(..).collect();
+
+                        let mut data_list: Vec<String> = vec![];
+                        for item in matches {
+                            let (_, data) = item.data;
+
+                            data_list.push(data.to_string());
+                        }
+                        self.filter.filtered_results.filtered_items = data_list.clone();
+                        self.filter.filtered_results.results = self
+                            .filter
+                            .filtered_results
+                            .results
+                            .clone()
+                            .items(self.filter.filtered_results.filtered_items.clone());
+                        Ok(Action::Nothing)
+                    }
+                    _ => Ok(action),
                 }
             }
             Focus::ConnectionFilterResults => self
                 .filter
                 .filtered_results
                 .handle_key_event(key_event, focus),
-            _ => Ok(None),
+            _ => Ok(Action::Nothing),
         }
     }
 
@@ -446,8 +536,7 @@ impl Component for Connections {
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
-        self.filter.register_config(self.config.clone(), focus)?;
-        Ok(())
+        self.filter.register_config(self.config.clone(), focus)
     }
     fn select_item(&mut self, item: &str, focus: Focus) -> Result<(), String> {
         if matches!(focus, Focus::Connections) {

@@ -52,11 +52,6 @@ impl App {
         tui.enter()?;
         tui.clear()?;
 
-        // regisration
-        // for component in self.components.iter_mut() {
-        //     component.register_action_handler(self.action_tx.clone())?;
-        // }
-        self.config.init()?;
         for component in self.components.iter_mut() {
             component.register_config(self.config.clone(), self.focus)?;
             component.init()?;
@@ -68,43 +63,56 @@ impl App {
             self.render(&mut tui)?;
 
             // after drawing, handle terminal events
-            match self.handle_events()? {
-                Action::Quit => break,
-                Action::Error(message) => {
-                    for component in self.components.iter_mut() {
-                        component.report_error(message.clone())?;
+            match self.handle_events() {
+                Ok(act) => match act {
+                    Action::Quit => break,
+                    // Action::Error(message) => {
+                    //     for component in self.components.iter_mut() {
+                    //         component.report_error(message.clone())?;
+                    //     }
+                    //     self.change_focus(Focus::Error);
+                    // }
+                    Action::ChangeFocus(focus) => self.change_focus(focus),
+                    Action::ListCloudProvider(cloud_config) => {
+                        self.config.cloud_config = cloud_config;
+                        for component in self.components.iter_mut() {
+                            component.register_config(self.config.clone(), self.focus)?;
+                        }
                     }
-                    self.change_focus(Focus::Error);
-                }
-                Action::ChangeFocus(focus) => self.change_focus(focus),
-                Action::ListCloudProvider(cloud_config) => {
-                    self.config.cloud_config = cloud_config;
-                    for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone(), self.focus)?;
+                    Action::ListConfiguration(cloud_config, selection, buckets) => {
+                        self.config.cloud_config = cloud_config;
+                        self.change_focus(Focus::Viewer);
+                        for component in self.components.iter_mut() {
+                            component.register_config(self.config.clone(), self.focus)?;
+                            component.list_items(buckets.clone(), selection.clone(), self.focus)?;
+                        }
                     }
-                }
-                Action::ListConfiguration(cloud_config, selection, buckets) => {
-                    self.config.cloud_config = cloud_config;
-                    self.change_focus(Focus::Viewer);
-                    for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone(), self.focus)?;
-                        component.list_items(buckets.clone(), selection.clone(), self.focus)?;
+                    Action::ActivateConfig(selection) => {
+                        self.config.cloud_config.activate_config(selection)?;
+                        for component in self.components.iter_mut() {
+                            component.register_config(self.config.clone(), self.focus)?;
+                        }
                     }
-                }
-                Action::ActivateConfig(selection) => {
-                    self.config.cloud_config.activate_config(selection)?;
-                    for component in self.components.iter_mut() {
-                        component.register_config(self.config.clone(), self.focus)?;
+                    Action::SelectFilteredItem(item, focus) => {
+                        self.change_focus(focus);
+                        for component in self.components.iter_mut() {
+                            component.select_item(&item, self.focus)?;
+                        }
                     }
-                }
-                Action::SelectFilteredItem(item, focus) => {
-                    self.change_focus(focus);
-                    for component in self.components.iter_mut() {
-                        component.select_item(&item, self.focus)?;
+                    _ => (), // Action::Nothing => (),
+                             // Action::Filter(_) => (),
+                             // Action::Skip => (),
+                             // Action::Error(_) => (),
+                },
+                Err(act) => match act {
+                    Action::Error(message) => {
+                        for component in self.components.iter_mut() {
+                            component.report_error(message.clone())?;
+                        }
+                        self.change_focus(Focus::Error);
                     }
-                }
-                Action::Nothing => (),
-                Action::Filter(_) => (),
+                    _ => break,
+                },
             };
             // if self
             //     .handle_events()
@@ -125,7 +133,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_events(&mut self) -> Result<Action, String> {
+    fn handle_events(&mut self) -> Result<Action, Action> {
         match crossterm::event::poll(Duration::from_millis(250)) {
             Ok(_) => match crossterm::event::read() {
                 Ok(event) => match event {
@@ -136,37 +144,33 @@ impl App {
                 },
                 Err(_) => {
                     let message = "Error reading events".to_string();
-                    Err(message)
+                    Err(Action::Error(message))
                 }
             },
             Err(_) => {
                 let message = "Error polling for events".to_string();
-                Err(message)
+                Err(Action::Error(message))
             }
         }
     }
 
-    fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action, String> {
+    fn handle_key_events(&mut self, key_event: KeyEvent) -> Result<Action, Action> {
         // convert key event into Key
-        // let key: Key = key_event.into();
+        let mut act = Action::Nothing;
 
-        let mut res = Action::Nothing;
         // handle event for components
         for component in self.components.iter_mut() {
-            let act = component.handle_key_event(key_event, self.focus)?;
-            if act
-                .clone()
-                .is_some_and(|a| matches!(a, Action::ActivateConfig(_selection)))
-            {
-                res = act.unwrap();
-            } else if act.is_some() {
-                res = act.unwrap()
+            let res = component.handle_key_event(key_event, self.focus)?;
+
+            if !matches!(res, Action::Skip) {
+                act = res
             }
         }
-        Ok(res)
+
+        Ok(act)
     }
 
-    fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action, String> {
+    fn handle_mouse_events(&mut self, mouse_event: MouseEvent) -> Result<Action, Action> {
         let res = Action::Nothing;
         // handle event for components
         for component in self.components.iter_mut() {

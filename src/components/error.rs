@@ -52,10 +52,10 @@ impl Component for ErrorComponent {
         &mut self,
         _key_event: crossterm::event::KeyEvent,
         focus: Focus,
-    ) -> Result<Option<crate::action::Action>, String> {
+    ) -> Result<Action, Action> {
         match focus {
-            Focus::Error => Ok(Some(Action::ChangeFocus(Focus::Connections))),
-            _ => Ok(None),
+            Focus::Error => Ok(Action::ChangeFocus(Focus::Connections)),
+            _ => Ok(Action::Skip),
         }
     }
 }

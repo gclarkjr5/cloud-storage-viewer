@@ -66,16 +66,16 @@ impl Component for ViewerFilterResults {
         &mut self,
         key_event: crossterm::event::KeyEvent,
         focus: Focus,
-    ) -> Result<Option<crate::action::Action>, String> {
+    ) -> Result<Action, Action> {
         let key: Key = key_event.into();
         match focus {
             Focus::ViewerFilterResults => {
                 if key == self.config.key_config.exit {
-                    Ok(Some(Action::Quit))
+                    Ok(Action::Quit)
                 } else if key == self.config.key_config.enter {
                     let item_idx = self.state.selected().unwrap();
                     let item = self.filtered_items[item_idx].clone();
-                    Ok(Some(Action::SelectFilteredItem(item, Focus::Viewer)))
+                    Ok(Action::SelectFilteredItem(item, Focus::Viewer))
                 } else if [
                     self.config.key_config.key_up,
                     self.config.key_config.arrow_up,
@@ -84,7 +84,7 @@ impl Component for ViewerFilterResults {
                 .any(|kc| kc == &key)
                 {
                     self.state.select_previous();
-                    Ok(None)
+                    Ok(Action::Nothing)
                 } else if [
                     self.config.key_config.key_down,
                     self.config.key_config.arrow_down,
@@ -93,14 +93,14 @@ impl Component for ViewerFilterResults {
                 .any(|kc| kc == &key)
                 {
                     self.state.select_next();
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 } else if key == self.config.key_config.change_focus {
-                    Ok(Some(Action::ChangeFocus(Focus::ViewerFilter)))
+                    Ok(Action::ChangeFocus(Focus::ViewerFilter))
                 } else {
-                    Ok(Some(Action::Nothing))
+                    Ok(Action::Nothing)
                 }
             }
-            _ => Ok(None),
+            _ => Ok(Action::Skip),
         }
     }
 }
