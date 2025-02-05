@@ -63,51 +63,82 @@ impl Connections {
 
         let cloud_provider = selection[1].clone();
         // find the node to append to
-        let found_node = self.find_node_to_append(&cloud_provider)?;
+        // let found_node = self.find_node_to_append(&cloud_provider)?;
 
-        // cloud_provider.create_nodes();
-        // if empty dont do anything
-        let cpr: CloudProvider = selection[1].clone().into();
-        println!("found node: {:?}", cpr);
+        // // cloud_provider.create_nodes();
+        // // if empty dont do anything
+        // let cpr: CloudProvider = selection[1].clone().into();
+        // println!("found node: {:?}", cpr);
+        // match found_node {
+        //     None => Ok(Action::Nothing),
+        //     Some(nid) => {
+        //         let o = self
+        //             .config
+        //             .cloud_config
+        //             .cloud_providers
+        //             .iter()
+        //             .find_map(|cp| match (cp, &cpr) {
+        //                 (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
+        //                     Some(Action::Error("Azure not implemented".to_string()))
+        //                 }
+        //                 (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
+        //                     configs.iter().for_each(|config| {
+        //                         let res = format!("{}/{}", cp, config.name.clone());
+
+        //                         self.tree
+        //                             .get_mut(nid)
+        //                             .expect("error getting mutable node")
+        //                             .append(res);
+        //                     });
+        //                     self.items = util::make_tree_items(
+        //                         self.tree.nodes(),
+        //                         &mut self.results_pager,
+        //                         focus,
+        //                     );
+        //                     self.state.open(selection.clone());
+        //                     Some(Action::Nothing)
+        //                 }
+        //                 (CloudProvider::S3(_), CloudProvider::S3(_)) => {
+        //                     Some(Action::Error("S3 not implemented".to_string()))
+        //                 }
+        //                 _ => Some(Action::Nothing),
+        //             });
+
+        //         match o {
+        //             Some(action) => Ok(action),
+        //             None => Err(Action::Error("error".to_string())),
+        //         }
+        //     }
+        // }
+        let found_node = self.find_node_to_append(&cloud_provider.clone().into())?;
+
         match found_node {
-            None => Ok(Action::Nothing),
-            Some(nid) => {
-                let o = self
-                    .config
-                    .cloud_config
-                    .cloud_providers
-                    .iter()
-                    .find_map(|cp| match (cp, &cpr) {
-                        (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
-                            Some(Action::Error("Azure not implemented".to_string()))
-                        }
-                        (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
-                            configs.iter().for_each(|config| {
-                                let res = format!("{}/{}", cp, config.name.clone());
+            None => {
+                // This node already has been requested, would you like to refresh it?
+                Err(Action::Error(
+                    "Refreshing nodes that have already been requested is currently not implemented"
+                        .to_string(),
+                ))
+            }
+            Some(node_id) => {
+                let matched_cloud_provider_configs =
+                    self.config.cloud_config.find_provider(cloud_provider)?;
 
-                                self.tree
-                                    .get_mut(nid)
-                                    .expect("error getting mutable node")
-                                    .append(res);
-                            });
-                            self.items = util::make_tree_items(
-                                self.tree.nodes(),
-                                &mut self.results_pager,
-                                focus,
-                            );
-                            self.state.open(selection.clone());
-                            Some(Action::Nothing)
-                        }
-                        (CloudProvider::S3(_), CloudProvider::S3(_)) => {
-                            Some(Action::Error("S3 not implemented".to_string()))
-                        }
-                        _ => Some(Action::Nothing),
-                    });
+                matched_cloud_provider_configs.iter().for_each(|config| {
+                    let res = config.get_name();
 
-                match o {
-                    Some(action) => Ok(action),
-                    None => Err(Action::Error("error".to_string())),
-                }
+                    self.tree
+                        .get_mut(node_id)
+                        .expect("error getting mutable node")
+                        .append(res);
+                });
+
+                // convert tree into tree widget items
+                self.items =
+                    util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+                self.state.open(selection);
+
+                Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
             }
         }
         // if found_node.is_none() {
