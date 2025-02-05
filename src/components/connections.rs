@@ -62,39 +62,51 @@ impl Connections {
         let cloud_provider = self.config.cloud_config.verify_implemented_cloud_provider(selection)?;
 
         // find the node to append to
-        let found_node = self.find_node_to_append(cloud_provider.clone().into());
+        let found_node = self.find_node_to_append(&cloud_provider.into())?;
 
         // if empty dont do anything
-        if found_node.is_none() {
-            return Ok(());
-        }
-        let (_selected, node_to_append_to) = found_node.unwrap();
+        match found_node {
+            None => Ok(Action::Nothing),
+            Some(nid) => {
+                let o = self.config
+                    .cloud_config
+                    .cloud_providers
+                    .iter()
+                    .find_map(|cp| match (cp, &cloud_provider) {
+                        (CloudProvider::Azure(_), CloudProvider::Azure(_)) => Some(Action::Error("Azure not implemented".to_string())),
+                        (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
+                            configs.iter().for_each(|config| {
+                                let res = format!("{}/{}", cp, config.name.clone());
 
-        self.config
-            .cloud_config
-            .cloud_providers
-            .iter()
-            .for_each(|cp| match (cp, &cloud_provider) {
-                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
-                (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
-                    configs.iter().for_each(|config| {
-                        let res = format!("{}/{}", cp, config.name.clone());
-
-                        self.tree
-                            .get_mut(node_to_append_to)
-                            .expect("error getting mutable node")
-                            .append(res);
+                                self.tree
+                                    .get_mut(nid)
+                                    .expect("error getting mutable node")
+                                    .append(res);
+                            });
+                            self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+                            self.state.open(selection);
+                            Some(Action::Nothing)
+                        }
+                        (CloudProvider::S3(_), CloudProvider::S3(_)) => Some(Action::Error("S3 not implemented".to_string())),
+                        _ => Some(Action::Error("some other combination".to_string())),
                     });
+
+                match o {
+                    Some(action) => Ok(action),
+                    None => Err(Action::Error("error".to_string()))
                 }
-                (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
-                _ => (),
-            });
+                
+            }
+        }
+        // if found_node.is_none() {
+        //     return Ok(());
+        // }
+        // let (_selected, node_to_append_to) = found_node.unwrap();
+
 
         // convert tree into tree widget items
-        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-        self.state.open(selection);
 
-        Ok(())
+        // Ok(())
     }
 
     pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Vec<u8>, String> {
@@ -106,27 +118,35 @@ impl Connections {
         Ok(output)
     }
 
-    pub fn find_node_to_append(&mut self, path_identifier: String) -> Option<(String, NodeId)> {
+    pub fn find_node_to_append(&mut self, path_identifier: &String) -> Result<Option<NodeId>, Action> {
         let found_node = self
             .tree
             .nodes()
-            .find(|node| node.value() == &path_identifier);
-
+            .find(|node| node.value() == path_identifier);
 
         match found_node {
-            Some(nref) => {
-                nref.has_children()
+            Some(node) if node.has_children() => Ok(None),
+            Some(node) => Ok(Some(node.id())),
+            None => {
+                let message = format!("Not able to find tree item at {}", path_identifier);
+                Err(Action::Error(message))
             }
         }
-        found_node?;
 
-        let node = found_node.expect("error unwrapping found node");
+        // match found_node {
+        //     Some(nref) => {
+        //         nref.has_children()
+        //     }
+        // }
+        // found_node?;
 
-        if node.has_children() {
-            return None;
-        }
+        // let node = found_node.expect("error unwrapping found node");
 
-        Some((path_identifier, node.id()))
+        // if node.has_children() {
+        //     return None;
+        // }
+
+        // Some((path_identifier, node.id()))
     }
 }
 
