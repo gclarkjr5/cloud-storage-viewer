@@ -24,7 +24,6 @@ use crate::config::Config;
 use crate::key::Key;
 use crate::util;
 
-
 #[derive(Debug)]
 pub struct Connections {
     pub state: TreeState<String>,
@@ -53,27 +52,35 @@ impl Connections {
         }
     }
 
-
     pub fn list_cloud_provider(
         &mut self,
         selection: Vec<String>,
         focus: Focus,
     ) -> Result<Action, Action> {
-        let cloud_provider = self.config.cloud_config.verify_implemented_cloud_provider(selection)?;
+        self.config
+            .cloud_config
+            .verify_implemented_cloud_provider(&selection)?;
 
+        let cloud_provider = selection[1].clone();
         // find the node to append to
-        let found_node = self.find_node_to_append(&cloud_provider.into())?;
+        let found_node = self.find_node_to_append(&cloud_provider)?;
 
+        // cloud_provider.create_nodes();
         // if empty dont do anything
+        let cpr: CloudProvider = selection[1].clone().into();
+        println!("found node: {:?}", cpr);
         match found_node {
             None => Ok(Action::Nothing),
             Some(nid) => {
-                let o = self.config
+                let o = self
+                    .config
                     .cloud_config
                     .cloud_providers
                     .iter()
-                    .find_map(|cp| match (cp, &cloud_provider) {
-                        (CloudProvider::Azure(_), CloudProvider::Azure(_)) => Some(Action::Error("Azure not implemented".to_string())),
+                    .find_map(|cp| match (cp, &cpr) {
+                        (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
+                            Some(Action::Error("Azure not implemented".to_string()))
+                        }
                         (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
                             configs.iter().for_each(|config| {
                                 let res = format!("{}/{}", cp, config.name.clone());
@@ -83,26 +90,30 @@ impl Connections {
                                     .expect("error getting mutable node")
                                     .append(res);
                             });
-                            self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-                            self.state.open(selection);
+                            self.items = util::make_tree_items(
+                                self.tree.nodes(),
+                                &mut self.results_pager,
+                                focus,
+                            );
+                            self.state.open(selection.clone());
                             Some(Action::Nothing)
                         }
-                        (CloudProvider::S3(_), CloudProvider::S3(_)) => Some(Action::Error("S3 not implemented".to_string())),
-                        _ => Some(Action::Error("some other combination".to_string())),
+                        (CloudProvider::S3(_), CloudProvider::S3(_)) => {
+                            Some(Action::Error("S3 not implemented".to_string()))
+                        }
+                        _ => Some(Action::Nothing),
                     });
 
                 match o {
                     Some(action) => Ok(action),
-                    None => Err(Action::Error("error".to_string()))
+                    None => Err(Action::Error("error".to_string())),
                 }
-                
             }
         }
         // if found_node.is_none() {
         //     return Ok(());
         // }
         // let (_selected, node_to_append_to) = found_node.unwrap();
-
 
         // convert tree into tree widget items
 
@@ -118,7 +129,10 @@ impl Connections {
         Ok(output)
     }
 
-    pub fn find_node_to_append(&mut self, path_identifier: &String) -> Result<Option<NodeId>, Action> {
+    pub fn find_node_to_append(
+        &mut self,
+        path_identifier: &String,
+    ) -> Result<Option<NodeId>, Action> {
         let found_node = self
             .tree
             .nodes()
@@ -267,7 +281,10 @@ impl Component for Connections {
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.activate_connection {
                     let selected = self.state.selected().to_vec();
-                    let cloud_provider = self.config.cloud_config.verify_implemented_cloud_provider(selected)?;
+                    let cloud_provider = self
+                        .config
+                        .cloud_config
+                        .verify_implemented_cloud_provider(&selected)?;
 
                     // first is the root, second is the cloud provider
                     if selected.len() < 3 {
@@ -313,7 +330,7 @@ impl Component for Connections {
                     if selected.len() == 2 {
                         // listing a cloud provider
 
-                        self.list_cloud_provider(, )
+                        self.list_cloud_provider(selected, Focus::Connections)
                         // match cloud_provider {
                         //     CloudProvider::Azure(_) => {
                         //         let message = format!("{} is not implemented yet", cloud_provider);
@@ -332,7 +349,7 @@ impl Component for Connections {
                         // }
                     } else if selected.len() == 3 {
                         // listing a config
-                        self.list_configuration()
+                        // self.list_configuration()
                         let buckets = self
                             .list_configuration(selected.clone())
                             .expect("error list configurations");

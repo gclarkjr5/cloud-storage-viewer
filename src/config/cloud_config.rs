@@ -44,21 +44,21 @@ impl Default for CloudConfig {
 impl CloudConfig {
     pub fn verify_implemented_cloud_provider(
         &self,
-        selected: Vec<String>,
-    ) -> Result<CloudProvider, Action> {
+        selected: &Vec<String>,
+    ) -> Result<Action, Action> {
         let cloud_provider: CloudProvider = selected[1].clone().into();
         match cloud_provider {
             CloudProvider::Azure(_) => {
                 let message = format!("{} is not implemented yet", cloud_provider);
-                Err(Action::Error(message))
+                Ok(Action::Error(message))
             }
             CloudProvider::Gcs(_) => {
-                cloud_provider.check_cli_tools();
-                Ok(cloud_provider)
+                cloud_provider.check_cli_tools()?;
+                Ok(Action::Nothing)
             }
             CloudProvider::S3(_) => {
                 let message = format!("{} is not implemented yet", cloud_provider);
-                Err(Action::Error(message))
+                Ok(Action::Error(message))
             }
         }
     }
