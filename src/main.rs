@@ -27,3 +27,20 @@ fn main() -> Result<(), String> {
         Err(_) => Err("error initializing logging".to_string()),
     }
 }
+
+// GCS structure
+// // Project/Account -- gcloud config configurations list, activate, create
+// // // Buckets -- gsutil ls
+// // // // Filesystem -- gsutil ls {bucket} ...
+
+// Azure structure
+// // Azure Subscription -- az account list, set --subscription, `cannot create`
+// // // Resource Groups -- az group list
+// // // // Storage Account -- az storage account list
+// // // // // Containers -- [az storage account keys list -n {account_name}, az storage container list --account-name {name} --account-key {key}]
+// // // // // // Filesystem (blobs) -- az storage blob list --container-name {container} --account-name {account} --account-key {key}
+
+// S3 structure
+// // Project/Account
+// // // Buckets
+// // // // Filesystem

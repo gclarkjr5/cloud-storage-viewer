@@ -90,12 +90,16 @@ impl Viewer {
     }
 }
 
-pub fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
-    Command::new(program)
-        .args(args)
-        .output()
-        .expect("error processing command")
-        .stdout
+pub fn cli_command(program: &str, args: &Vec<&str>) -> Result<Vec<u8>, Action> {
+    match Command::new(program).args(args).output() {
+        Ok(output) => Ok(output.stdout),
+        Err(_) => {
+            let message = [program.to_string(), args.join(" ")].join(" ");
+            Err(Action::Error(message))
+        }
+    }
+    // .expect("error processing command")
+    // .stdout
 }
 
 impl Component for Viewer {
@@ -235,7 +239,7 @@ impl Component for Viewer {
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
                     let actual_request_path = selected.last().unwrap();
-                    let data = cli_command("gsutil", vec!["ls", actual_request_path]);
+                    let data = cli_command("gsutil", &vec!["ls", actual_request_path])?;
                     self.list_items(data, selected, focus)
                         .expect("error calling list items");
                     Ok(Action::Nothing)

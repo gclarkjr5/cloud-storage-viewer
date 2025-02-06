@@ -19,7 +19,6 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::action::Action;
 use crate::app::Focus;
-use crate::config::cloud_config::{CloudProvider, CloudProviderInit};
 use crate::config::Config;
 use crate::key::Key;
 use crate::util;
@@ -150,13 +149,18 @@ impl Connections {
         // Ok(())
     }
 
-    pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Vec<u8>, String> {
+    pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Action, Action> {
         // set active cloud
         self.config.cloud_config.activate_config(path)?;
 
         let output = cli_command("gsutil", vec!["ls"]);
 
-        Ok(output)
+        Ok(Action::ListConfiguration(
+            self.config.cloud_config.clone(),
+            vec![format!("{}", self.config.cloud_config)],
+            output,
+        ))
+        // Ok(output)
     }
 
     pub fn find_node_to_append(
@@ -311,27 +315,30 @@ impl Component for Connections {
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.activate_connection {
                     let selected = self.state.selected().to_vec();
-                    let cloud_provider = self
-                        .config
+                    self.config
                         .cloud_config
                         .verify_implemented_cloud_provider(&selected)?;
 
                     // first is the root, second is the cloud provider
                     if selected.len() < 3 {
+                        // then we only have root + provider
                         Ok(Action::Nothing)
                     } else {
-                        let cloud_provider: CloudProvider = selected[1].clone().into();
-                        match cloud_provider {
-                            CloudProvider::Azure(_) => {
-                                let message = format!("{} is not implemented yet", cloud_provider);
-                                Ok(Action::Error(message))
-                            }
-                            CloudProvider::Gcs(_) => Ok(Action::ActivateConfig(selected)),
-                            CloudProvider::S3(_) => {
-                                let message = format!("{} is not implemented yet", cloud_provider);
-                                Ok(Action::Error(message))
-                            }
-                        }
+                        self.config.cloud_config.activate_config(selected)
+                        // root + provider + account or more
+                        // let cloud_provider: CloudProvider = selected[1].clone().into();
+                        // Ok(Action::ActivateConfig(selected))
+                        // match cloud_provider {
+                        //     CloudProvider::Azure(_) => {
+                        //         let message = format!("{} is not implemented yet", cloud_provider);
+                        //         Ok(Action::Error(message))
+                        //     }
+                        //     CloudProvider::Gcs(_) => Ok(Action::ActivateConfig(selected)),
+                        //     CloudProvider::S3(_) => {
+                        //         let message = format!("{} is not implemented yet", cloud_provider);
+                        //         Ok(Action::Error(message))
+                        //     }
+                        // }
                     }
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
@@ -380,14 +387,12 @@ impl Component for Connections {
                     } else if selected.len() == 3 {
                         // listing a config
                         // self.list_configuration()
-                        let buckets = self
-                            .list_configuration(selected.clone())
-                            .expect("error list configurations");
-                        Ok(Action::ListConfiguration(
-                            self.config.cloud_config.clone(),
-                            vec![format!("{}", self.config.cloud_config)],
-                            buckets,
-                        ))
+                        self.list_configuration(selected.clone())
+                        // Ok(Action::ListConfiguration(
+                        //     self.config.cloud_config.clone(),
+                        //     vec![format!("{}", self.config.cloud_config)],
+                        //     buckets,
+                        // ))
                     } else {
                         Ok(Action::Nothing)
                     }

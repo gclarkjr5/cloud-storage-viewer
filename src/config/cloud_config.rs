@@ -1,4 +1,4 @@
-use std::fmt::{self, Display};
+use std::fmt::{self, Display, Error};
 use std::io::BufRead;
 use std::process::Command;
 use std::result::Result;
@@ -6,6 +6,7 @@ use std::result::Result;
 use ego_tree::{NodeId, Tree};
 
 use crate::action::Action;
+use crate::components::viewer::cli_command;
 
 #[derive(Debug, Clone)]
 pub struct CloudConfig {
@@ -17,13 +18,17 @@ impl Display for CloudConfig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.active_cloud_provider.is_some() {
             let cloud: String = self.active_cloud_provider.clone().unwrap().into();
-            let ac = self
+            let ac_res = self
                 .active_cloud_provider
                 .clone()
                 .unwrap()
                 .get_active_config();
 
-            write!(f, "{ac}({cloud})")
+            if let Ok(ac) = ac_res {
+                write!(f, "{ac}({cloud})")
+            } else {
+                Err(Error)
+            }
         } else {
             write!(f, "No Active Cloud Provider")
         }
@@ -109,9 +114,9 @@ impl CloudConfig {
             });
     }
 
-    pub fn activate_config(&mut self, path_identifier: Vec<String>) -> Result<(), String> {
+    pub fn activate_config(&mut self, path_identifier: Vec<String>) -> Result<Action, Action> {
         // get the cloud in the path identifer as well as possible new connection
-        let cloud_provider = path_identifier[1].clone().into();
+        let mut cloud_provider: CloudProvider = path_identifier[1].clone().into();
         let new_config = path_identifier[2]
             .clone()
             .split('/')
@@ -119,29 +124,38 @@ impl CloudConfig {
             .unwrap()
             .to_string();
 
-        self.cloud_providers
-            .iter()
-            .for_each(|cp| match (cp, &cloud_provider) {
-                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
-                (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => {
-                    let current_conn = cp.get_active_config();
+        let current_conn = cloud_provider.get_active_config()?;
+        if current_conn != new_config {
+            cloud_provider.activate_new_config(new_config.clone())?;
+        }
 
-                    if current_conn != new_config {
-                        cp.activate_new_config(new_config.clone());
-                    }
-                }
-                (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
-                _ => (),
-            });
+        // self.cloud_providers
+        //     .iter()
+        //     .for_each(|cp| match (cp, &cloud_provider) {
+        //         (CloudProvider::Azure(_), CloudProvider::Azure(_)) => (),
+        //         (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => {
+        //             let current_conn = cp.get_active_config();
 
-        self.update(cloud_provider);
+        //             if current_conn != new_config {
+        //                 cp.activate_new_config(new_config.clone())?;
+        //             }
+        //         }
+        //         (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
+        //         _ => (),
+        //     });
 
-        Ok(())
+        self.update(&mut cloud_provider)?;
+        Ok(Action::ActivateConfig(self.clone()))
+
+        // Ok(())
     }
 
-    fn update(&mut self, cloud_provider: CloudProvider) {
-        self.list_config(cloud_provider.clone());
-        self.set_active_cloud(cloud_provider)
+    fn update(&mut self, cloud_provider: &mut CloudProvider) -> Result<Action, Action> {
+        // self.list_config(cloud_provider.clone())?;
+        cloud_provider.update()?;
+        self.active_cloud_provider = Some(cloud_provider.clone());
+        Ok(Action::Nothing)
+        // self.set_active_cloud(cloud_provider)
     }
 
     pub fn list_config(&mut self, cloud_provider: CloudProvider) {
@@ -170,6 +184,16 @@ impl Default for CloudProvider {
     }
 }
 
+impl CloudProvider {}
+
+// pub trait CloudProviderInit {
+//     fn update(&mut self) -> Result<(), String>;
+//     fn get_active_config(&self) -> String;
+//     fn activate_new_config(&self, new_connection: String);
+//     fn check_cli_tools(&self) -> Result<(), Action>;
+// }
+
+// impl CloudProviderInit for CloudProvider {
 impl CloudProvider {
     pub fn create_nodes(&self, tree: &mut Tree<String>, node_id: NodeId) -> Result<(), Action> {
         match self {
@@ -187,17 +211,7 @@ impl CloudProvider {
             Self::S3(_) => Err(Action::Error("S3 not implemented".to_string())),
         }
     }
-}
-
-pub trait CloudProviderInit {
-    fn update(&mut self) -> Result<(), String>;
-    fn get_active_config(&self) -> String;
-    fn activate_new_config(&self, new_connection: String);
-    fn check_cli_tools(&self) -> Result<(), Action>;
-}
-
-impl CloudProviderInit for CloudProvider {
-    fn check_cli_tools(&self) -> Result<(), Action> {
+    pub fn check_cli_tools(&self) -> Result<(), Action> {
         match self {
             Self::Azure(_) => Err(Action::Error("Azure not implemented".to_string())),
             Self::Gcs(_) => {
@@ -216,63 +230,82 @@ impl CloudProviderInit for CloudProvider {
             Self::S3(_) => Err(Action::Error("S3 not implemented".to_string())),
         }
     }
-    fn update(&mut self) -> Result<(), String> {
+    pub fn update(&mut self) -> Result<(), Action> {
         match self {
-            Self::Azure(_) => Err("Azure not implemented".to_string()),
+            Self::Azure(_) => Err(Action::Error("Azure update not implemented".to_string())),
             Self::Gcs(config) => {
                 config.clear();
-                Command::new("gcloud")
+
+                match Command::new("gcloud")
                     .args(vec!["config", "configurations", "list"])
                     .output()
-                    .expect("error getting config list")
-                    .stdout
-                    .lines()
-                    .skip(1)
-                    .for_each(|line| {
-                        let splits = line
-                            .expect("error getting line in config list")
-                            .split_whitespace()
-                            .map(|split| split.to_string())
-                            .collect::<Vec<String>>();
+                {
+                    Ok(output) => {
+                        output.stdout.lines().skip(1).for_each(|line| {
+                            let splits = line
+                                .expect("error getting line in config list")
+                                .split_whitespace()
+                                .map(|split| split.to_string())
+                                .collect::<Vec<String>>();
 
-                        let conf = GcsConfig {
-                            name: splits[0].clone(),
-                            is_active: splits[1].clone(),
-                            // account: account.clone(),
-                            // project: project.clone(),
-                        };
+                            let conf = GcsConfig {
+                                name: splits[0].clone(),
+                                is_active: splits[1].clone(),
+                                // account: account.clone(),
+                                // project: project.clone(),
+                            };
 
-                        config.push(conf);
-                    });
-                Ok(())
+                            config.push(conf);
+                        });
+                        Ok(())
+                    }
+                    Err(_) => Err(Action::Error(
+                        "error calling gcloud config configurations list command".to_string(),
+                    )),
+                }
             }
-            Self::S3(_) => Err("S3 not implemented".to_string()),
+            Self::S3(_) => Err(Action::Error("S3 update not implemented".to_string())),
         }
     }
-    fn get_active_config(&self) -> String {
+    fn get_active_config(&self) -> Result<String, Action> {
         match self {
-            Self::Azure(_confs) => unimplemented!(),
+            Self::Azure(_confs) => Err(Action::Error(
+                "Azure get active config not implemented".to_string(),
+            )),
             Self::Gcs(confs) => {
                 let gcsconf = confs.iter().find(|c| c.is_active == "True");
 
                 if let Some(gc) = gcsconf {
-                    gc.name.clone()
+                    Ok(gc.name.clone())
                 } else {
-                    String::new()
+                    Ok(String::new())
                 }
             }
-            Self::S3(_confs) => unimplemented!(),
+            Self::S3(_confs) => Err(Action::Error(
+                "S3 get active config not implemented".to_string(),
+            )),
         }
     }
-    fn activate_new_config(&self, new_config: String) {
+    fn activate_new_config(&self, new_config: String) -> Result<(), Action> {
         match self {
             Self::Azure(_confs) => unimplemented!(),
             Self::Gcs(_) => {
-                Command::new("gcloud")
-                    .args(["config", "configurations", "activate"])
-                    .arg(new_config)
-                    .output()
-                    .expect("error creating new gcloud config");
+                // if .is_err() {
+                //     Err(Action::Error())
+                // }
+                if let Err(e) = cli_command(
+                    "gcloud",
+                    &vec!["config", "configurations", "activate", &new_config],
+                ) {
+                    Err(e)
+                } else {
+                    Ok(())
+                }
+                // Command::new("gcloud")
+                //     .args()
+                //     .arg(new_config)
+                //     .output()
+                //     .expect("error creating new gcloud config");
             }
             Self::S3(_confs) => unimplemented!(),
         }

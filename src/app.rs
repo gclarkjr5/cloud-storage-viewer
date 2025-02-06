@@ -36,7 +36,8 @@ impl App {
         Self {
             _should_quit: false,
             components: vec![
-                Box::new(Connections::new()),
+                // Box::new(Self::new()),
+                Box::new(Connections::default()),
                 Box::new(Viewer::default()),
                 Box::new(Footer::default()),
                 Box::new(ErrorComponent::default()),
@@ -66,12 +67,6 @@ impl App {
             match self.handle_events() {
                 Ok(act) => match act {
                     Action::Quit => break,
-                    // Action::Error(message) => {
-                    //     for component in self.components.iter_mut() {
-                    //         component.report_error(message.clone())?;
-                    //     }
-                    //     self.change_focus(Focus::Error);
-                    // }
                     Action::ChangeFocus(focus) => self.change_focus(focus),
                     Action::ListCloudProvider(cloud_config) => {
                         self.config.cloud_config = cloud_config;
@@ -87,8 +82,9 @@ impl App {
                             component.list_items(buckets.clone(), selection.clone(), self.focus)?;
                         }
                     }
-                    Action::ActivateConfig(selection) => {
-                        self.config.cloud_config.activate_config(selection)?;
+                    Action::ActivateConfig(cloud_config) => {
+                        self.config.cloud_config = cloud_config;
+                        // self.config.cloud_config.activate_config(cloud_config)?;
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
                         }
@@ -99,10 +95,7 @@ impl App {
                             component.select_item(&item, self.focus)?;
                         }
                     }
-                    _ => (), // Action::Nothing => (),
-                             // Action::Filter(_) => (),
-                             // Action::Skip => (),
-                             // Action::Error(_) => (),
+                    _ => (),
                 },
                 Err(act) => match act {
                     Action::Error(message) => {
