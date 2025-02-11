@@ -1,9 +1,8 @@
 use std::result::Result;
 use std::sync::Arc;
-use std::{io::BufRead, process::Command};
 
 use crossterm::event::{KeyEvent, MouseEventKind};
-use ego_tree::{NodeId, NodeRef, Tree as ETree};
+use ego_tree::{NodeRef, Tree as ETree};
 use nucleo::pattern::{CaseMatching, Normalization};
 use nucleo::{Config as NucleoConfig, Nucleo};
 use ratatui::layout::{Constraint, Layout, Position};
@@ -72,85 +71,82 @@ impl Viewer {
         }
     }
 
-    pub fn find_node_to_append(&mut self, path: Vec<String>) -> Option<(String, NodeId)> {
-        // use the selction to find the node in the tree
-        let selection = path.last().unwrap();
+    // pub fn find_node_to_append(&mut self, path: Vec<String>) -> Option<(String, NodeId)> {
+    //     // use the selction to find the node in the tree
+    //     let selection = path.last().unwrap();
 
-        let found_node = self.tree.nodes().find(|node| node.value() == selection);
+    //     let found_node = self.tree.nodes().find(|node| node.value() == selection);
 
-        found_node.as_ref()?;
-        let node = found_node.expect("error unwrapping found node");
+    //     found_node.as_ref()?;
+    //     let node = found_node.expect("error unwrapping found node");
 
-        if node.has_children() {
-            return None;
-        }
+    //     if node.has_children() {
+    //         return None;
+    //     }
 
-        // return the selction and the node id
-        Some((selection.clone(), node.id()))
-    }
+    //     // return the selction and the node id
+    //     Some((selection.clone(), node.id()))
+    // }
 }
 
-pub fn cli_command(program: &str, args: &Vec<&str>) -> Result<Vec<u8>, Action> {
-    match Command::new(program).args(args).output() {
-        Ok(output) => Ok(output.stdout),
-        Err(_) => {
-            let message = [program.to_string(), args.join(" ")].join(" ");
-            Err(Action::Error(message))
-        }
-    }
-    // .expect("error processing command")
-    // .stdout
-}
+// pub fn cli_command(program: &str, args: &Vec<&str>) -> Result<Vec<u8>, Action> {
+//     util::cli_command(program, args)
+//     match Command::new(program).args(args).output() {
+//         Ok(output) => Ok(output.stdout),
+//         Err(_) => {
+//             let message = [program.to_string(), args.join(" ")].join(" ");
+//             Err(Action::Error(message))
+//         }
+//     }
+//     // .expect("error processing command")
+//     // .stdout
+// }
 
 impl Component for Viewer {
-    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<(), String> {
+    fn list_item(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<(), Action> {
         // find node, verify, unwrap, and set pager
-        let found_node = self.find_node_to_append(path.clone());
+        let found_node = util::find_node_to_append(&mut self.tree, &path)?;
 
-        if found_node.is_none() {
-            return Ok(());
-        }
+        // if found_node.is_none() {
+        //     return Ok(());
+        // }
 
-        let (selection, node_to_append_to) = found_node.unwrap();
+        // let (selection, node_to_append_to) = found_node.unwrap();
 
-        let is_directory = selection.chars().last().expect("error getting last char") == '/';
+        match found_node {
+            None => Ok(()),
+            Some(node_id) => {
+                let selection = path.last().unwrap();
+                let is_directory =
+                    selection.chars().last().expect("error getting last char") == '/';
 
-        match is_directory {
-            true => {
-                data.lines().for_each(|listing| {
-                    let res = listing.expect("error getting listing from stdout");
-                    self.tree
-                        .get_mut(node_to_append_to)
-                        .expect("error getting mutable node")
-                        .append(res);
-                });
-            }
-            false => {
-                let root = self.tree.root().value();
-                match root == &selection {
+                match is_directory {
                     true => {
-                        data.lines().for_each(|listing| {
-                            let res = listing.expect("error getting listing");
-                            self.tree
-                                .get_mut(node_to_append_to)
-                                .expect("error getting mutable node")
-                                .append(res);
-                        });
+                        util::add_tree_items(data.clone(), &mut self.tree, node_id);
                     }
-                    false => {}
+                    false => {
+                        let root = self.tree.root().value();
+                        match root == selection {
+                            true => {
+                                util::add_tree_items(data.clone(), &mut self.tree, node_id);
+                            }
+                            false => {}
+                        }
+                    }
                 }
+
+                // remake tree widget
+                self.results_pager.init(&data, path.clone());
+                self.pagers.push(self.results_pager.clone());
+                self.items =
+                    util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+
+                self.state.open(path.clone());
+                self.state.select(path);
+
+                Ok(())
             }
         }
-
-        // remake tree widget
-        self.results_pager.init(&data, path.clone());
-        self.pagers.push(self.results_pager.clone());
-        self.items = util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-
-        self.state.open(path.clone());
-        self.state.select(path);
-
-        Ok(())
     }
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
@@ -239,8 +235,8 @@ impl Component for Viewer {
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
                     let actual_request_path = selected.last().unwrap();
-                    let data = cli_command("gsutil", &vec!["ls", actual_request_path])?;
-                    self.list_items(data, selected, focus)
+                    let data = util::cli_command("gsutil", &vec!["ls", actual_request_path])?;
+                    self.list_item(data, selected, focus)
                         .expect("error calling list items");
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.next_page {

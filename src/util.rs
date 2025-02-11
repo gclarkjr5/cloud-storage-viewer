@@ -1,7 +1,46 @@
-use ego_tree::{iter::Nodes, NodeRef};
+use std::io::BufRead;
+use std::process::Command;
+
+use ego_tree::{iter::Nodes, NodeId, NodeRef, Tree};
 use tui_tree_widget::TreeItem;
 
-use crate::{app::Focus, components::results_pager::ResultsPager};
+use crate::{action::Action, app::Focus, components::results_pager::ResultsPager};
+
+pub fn cli_command(program: &str, args: &Vec<&str>) -> Result<Vec<u8>, Action> {
+    match Command::new(program).args(args).output() {
+        Ok(output) => Ok(output.stdout),
+        Err(_) => {
+            let message = [program.to_string(), args.join(" ")].join(" ");
+            Err(Action::Error(message))
+        }
+    }
+}
+
+pub fn add_tree_items(data: Vec<u8>, tree: &mut Tree<String>, node_id: NodeId) {
+    data.lines().for_each(|listing| {
+        let res = listing.expect("error getting listing");
+        tree.get_mut(node_id)
+            .expect("error getting mutable node")
+            .append(res);
+    });
+}
+
+pub fn find_node_to_append(
+    tree: &mut Tree<String>,
+    path_identifier: &Vec<String>,
+) -> Result<Option<NodeId>, Action> {
+    let selection = path_identifier.last().unwrap();
+    let found_node = tree.nodes().find(|node| node.value() == selection);
+
+    match found_node {
+        Some(node) if node.has_children() => Ok(None),
+        Some(node) => Ok(Some(node.id())),
+        None => {
+            let message = format!("Not able to find tree item at {}", selection);
+            Err(Action::Error(message))
+        }
+    }
+}
 
 pub fn make_tree_items(
     nodes: Nodes<String>,

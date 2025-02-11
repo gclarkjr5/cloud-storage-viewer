@@ -79,7 +79,17 @@ impl App {
                         self.change_focus(Focus::Viewer);
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
-                            component.list_items(buckets.clone(), selection.clone(), self.focus)?;
+                            match component.list_item(
+                                buckets.clone(),
+                                selection.clone(),
+                                self.focus,
+                            ) {
+                                Ok(_) => Ok(()),
+                                Err(act) => match act {
+                                    Action::Error(e) => Err(e),
+                                    _ => Ok(()),
+                                },
+                            }?;
                         }
                     }
                     Action::ActivateConfig(cloud_config) => {

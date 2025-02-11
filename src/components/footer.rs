@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::{app::Focus, config::Config};
+use crate::{action::Action, app::Focus, config::Config};
 
 use super::{results_pager::ResultsPager, Component};
 
@@ -23,12 +23,12 @@ impl Component for Footer {
         Ok(())
     }
 
-    fn list_items(
+    fn list_item(
         &mut self,
         data: Vec<u8>,
         _path: Vec<String>,
         _focus: Focus,
-    ) -> Result<(), String> {
+    ) -> Result<(), Action> {
         self.results_pager.init(&data, Vec::new());
         Ok(())
     }

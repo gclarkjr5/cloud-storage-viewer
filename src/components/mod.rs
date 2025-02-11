@@ -36,7 +36,7 @@ pub trait Component {
         Ok(Action::Nothing)
     }
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
-    fn list_items(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<(), String> {
+    fn list_item(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<(), Action> {
         let _data = data;
         let _path = path;
         let _focus = focus;

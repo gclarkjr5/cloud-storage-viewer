@@ -2,7 +2,7 @@ use super::connection_filter::ConnectionFilter;
 use super::results_pager::ResultsPager;
 use super::Component;
 use crossterm::event::{KeyEvent, MouseEventKind};
-use ego_tree::{NodeId, Tree as ETree};
+use ego_tree::Tree as ETree;
 use nucleo::pattern::{CaseMatching, Normalization};
 use nucleo::{Config as NucleoConfig, Nucleo};
 use ratatui::layout::{Constraint, Layout, Position, Rect};
@@ -11,7 +11,6 @@ use ratatui::widgets::block::Block;
 use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 
 use ratatui::Frame;
-use std::process::Command;
 use std::result::Result;
 use std::sync::Arc;
 use std::vec;
@@ -51,151 +50,83 @@ impl Connections {
         }
     }
 
+    pub fn activate_connection(&mut self, selection: Vec<String>) -> Result<Action, Action> {
+        let cloud_provider = selection[1].clone().into();
+
+        // verify that the selected connection is for an implemented cloud
+        // technically should never happen, mainly to see how far development
+        // of more cloud implementations has gotten
+        self.config
+            .cloud_config
+            .verify_implemented_cloud_provider(cloud_provider)?;
+
+        // first is the root, second is the cloud provider
+        if selection.len() < 3 {
+            // then we only have root + provider
+            Ok(Action::Nothing)
+        } else {
+            self.config.cloud_config.activate_config(selection)
+        }
+    }
     pub fn list_cloud_provider(
         &mut self,
         selection: Vec<String>,
         focus: Focus,
     ) -> Result<Action, Action> {
+        let cp = selection[1].clone().into();
         let mut cloud_provider = self
             .config
             .cloud_config
-            .verify_implemented_cloud_provider(&selection)?;
+            .verify_implemented_cloud_provider(cp)?;
 
         // find the node to append to
-        let found_node = self.find_node_to_append(&cloud_provider.clone().into())?;
+        let found_node = util::find_node_to_append(&mut self.tree, &selection)?;
 
-        // cloud_provider.create_nodes();
         // if empty dont do anything
-        // let cpr: CloudProvider = selection[1].clone().into();
         match found_node {
             None => Ok(Action::Nothing),
             Some(nid) => {
-                cloud_provider.update().unwrap();
+                cloud_provider.update()?;
                 cloud_provider.create_nodes(&mut self.tree, nid)?;
                 self.items =
                     util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
                 self.state.open(selection.clone());
                 Ok(Action::Nothing)
-
-                // let o = self
-                //     .config
-                //     .cloud_config
-                //     .cloud_providers
-                //     .iter()
-                //     .find_map(|cp| match (cp, &cloud_provider) {
-                //         (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
-                //             Some(Action::Error("Azure not implemented".to_string()))
-                //         }
-                //         (CloudProvider::Gcs(configs), CloudProvider::Gcs(_)) => {
-                //             configs.iter().for_each(|config| {
-                //                 let res = format!("{}/{}", cp, config.name.clone());
-
-                //                 self.tree
-                //                     .get_mut(nid)
-                //                     .expect("error getting mutable node")
-                //                     .append(res);
-                //             });
-                //         }
-                //         (CloudProvider::S3(_), CloudProvider::S3(_)) => {
-                //             Some(Action::Error("S3 not implemented".to_string()))
-                //         }
-                //         _ => Some(Action::Nothing),
-                //     });
-
-                // match o {
-                //     Some(action) => Ok(action),
-                //     None => Err(Action::Error("error".to_string())),
-                // }
             }
         }
-        // let found_node = self.find_node_to_append(&cloud_provider.clone().into())?;
-
-        // match found_node {
-        //     None => {
-        //         // This node already has been requested, would you like to refresh it?
-        //         Err(Action::Error(
-        //             "Refreshing nodes that have already been requested is currently not implemented"
-        //                 .to_string(),
-        //         ))
-        //     }
-        //     Some(node_id) => {
-        //         let matched_cloud_provider_configs =
-        //             self.config.cloud_config.find_provider(cloud_provider)?;
-
-        //         matched_cloud_provider_configs.iter().for_each(|config| {
-        //             let res = config.get_name();
-
-        //             self.tree
-        //                 .get_mut(node_id)
-        //                 .expect("error getting mutable node")
-        //                 .append(res);
-        //         });
-
-        //         // convert tree into tree widget items
-        //         self.items =
-        //             util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-        //         self.state.open(selection);
-
-        //         Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
-        //     }
-        // }
-        // if found_node.is_none() {
-        //     return Ok(());
-        // }
-        // let (_selected, node_to_append_to) = found_node.unwrap();
-
-        // convert tree into tree widget items
-
-        // Ok(())
     }
 
     pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Action, Action> {
         // set active cloud
         self.config.cloud_config.activate_config(path)?;
 
-        let output = cli_command("gsutil", vec!["ls"]);
+        let output = util::cli_command("gsutil", &vec!["ls"])?;
 
         Ok(Action::ListConfiguration(
             self.config.cloud_config.clone(),
             vec![format!("{}", self.config.cloud_config)],
             output,
         ))
-        // Ok(output)
     }
 
-    pub fn find_node_to_append(
-        &mut self,
-        path_identifier: &String,
-    ) -> Result<Option<NodeId>, Action> {
-        let found_node = self
-            .tree
-            .nodes()
-            .find(|node| node.value() == path_identifier);
+    // pub fn find_node_to_append(
+    //     &mut self,
+    //     path_identifier: &String,
+    // ) -> Result<Option<NodeId>, Action> {
+    //     let found_node = self
+    //         .tree
+    //         .nodes()
+    //         .find(|node| node.value() == path_identifier);
 
-        match found_node {
-            Some(node) if node.has_children() => Ok(None),
-            Some(node) => Ok(Some(node.id())),
-            None => {
-                let message = format!("Not able to find tree item at {}", path_identifier);
-                Err(Action::Error(message))
-            }
-        }
-
-        // match found_node {
-        //     Some(nref) => {
-        //         nref.has_children()
-        //     }
-        // }
-        // found_node?;
-
-        // let node = found_node.expect("error unwrapping found node");
-
-        // if node.has_children() {
-        //     return None;
-        // }
-
-        // Some((path_identifier, node.id()))
-    }
+    //     match found_node {
+    //         Some(node) if node.has_children() => Ok(None),
+    //         Some(node) => Ok(Some(node.id())),
+    //         None => {
+    //             let message = format!("Not able to find tree item at {}", path_identifier);
+    //             Err(Action::Error(message))
+    //         }
+    //     }
+    // }
 }
 
 impl Component for Connections {
@@ -216,13 +147,12 @@ impl Component for Connections {
             .filter(|node| node.parent().is_none())
             .for_each(|node| {
                 let val = node.value().to_string();
-                let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
-                    .expect("error creating nodes under parent");
+                if let Ok(mut ti) = TreeItem::new(val.clone(), val.clone(), vec![]) {
+                    let mut results_pager = self.results_pager.clone();
 
-                let mut results_pager = self.results_pager.clone();
-
-                util::add_children(node, &mut ti, &mut results_pager, Focus::Connections);
-                items.push(ti);
+                    util::add_children(node, &mut ti, &mut results_pager, Focus::Connections);
+                    items.push(ti);
+                }
             });
 
         self.tree = tree;
@@ -315,84 +245,16 @@ impl Component for Connections {
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.activate_connection {
                     let selected = self.state.selected().to_vec();
-                    self.config
-                        .cloud_config
-                        .verify_implemented_cloud_provider(&selected)?;
-
-                    // first is the root, second is the cloud provider
-                    if selected.len() < 3 {
-                        // then we only have root + provider
-                        Ok(Action::Nothing)
-                    } else {
-                        self.config.cloud_config.activate_config(selected)
-                        // root + provider + account or more
-                        // let cloud_provider: CloudProvider = selected[1].clone().into();
-                        // Ok(Action::ActivateConfig(selected))
-                        // match cloud_provider {
-                        //     CloudProvider::Azure(_) => {
-                        //         let message = format!("{} is not implemented yet", cloud_provider);
-                        //         Ok(Action::Error(message))
-                        //     }
-                        //     CloudProvider::Gcs(_) => Ok(Action::ActivateConfig(selected)),
-                        //     CloudProvider::S3(_) => {
-                        //         let message = format!("{} is not implemented yet", cloud_provider);
-                        //         Ok(Action::Error(message))
-                        //     }
-                        // }
-                    }
+                    self.activate_connection(selected)
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
-
-                    // self.config.cloud_config.list_config(cloud_provider.clone());
-                    // self.list_cloud_provider(selected, focus)
-                    //     .expect("error list cloud providers");
-                    // Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
-                    // match cloud_provider {
-                    //     CloudProvider::Azure(_) => {
-                    //         let message = format!("{} is not implemented yet", cloud_provider);
-                    //         Ok(Action::Error(message))
-                    //     }
-                    //     CloudProvider::Gcs(_) => {
-                    //         self.config.cloud_config.list_config(cloud_provider.clone());
-                    //         self.list_cloud_provider(selected, focus)
-                    //             .expect("error list cloud providers");
-                    //         Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
-                    //     }
-                    //     CloudProvider::S3(_) => {
-                    //         let message = format!("{} is not implemented yet", cloud_provider);
-                    //         Ok(Action::Error(message))
-                    //     }
-                    // }
-
+                    // self.list_item(selection)
                     if selected.len() == 2 {
                         // listing a cloud provider
-
                         self.list_cloud_provider(selected, Focus::Connections)
-                        // match cloud_provider {
-                        //     CloudProvider::Azure(_) => {
-                        //         let message = format!("{} is not implemented yet", cloud_provider);
-                        //         Ok(Action::Error(message))
-                        //     }
-                        //     CloudProvider::Gcs(_) => {
-                        //         self.config.cloud_config.list_config(cloud_provider.clone());
-                        //         self.list_cloud_provider(selected, focus)
-                        //             .expect("error list cloud providers");
-                        //         Ok(Action::ListCloudProvider(self.config.cloud_config.clone()))
-                        //     }
-                        //     CloudProvider::S3(_) => {
-                        //         let message = format!("{} is not implemented yet", cloud_provider);
-                        //         Ok(Action::Error(message))
-                        //     }
-                        // }
                     } else if selected.len() == 3 {
                         // listing a config
-                        // self.list_configuration()
                         self.list_configuration(selected.clone())
-                        // Ok(Action::ListConfiguration(
-                        //     self.config.cloud_config.clone(),
-                        //     vec![format!("{}", self.config.cloud_config)],
-                        //     buckets,
-                        // ))
                     } else {
                         Ok(Action::Nothing)
                     }
@@ -408,7 +270,6 @@ impl Component for Connections {
                 let action = self.filter.handle_key_event(key_event, focus)?;
                 match action {
                     Action::Filter(txt) => {
-                        let search_term = txt.last().unwrap();
                         self.filter.filtered_results.items = self
                             .tree
                             .nodes()
@@ -447,14 +308,17 @@ impl Component for Connections {
                             });
                         }
 
+                        if let Some(search_term) = txt.last() {
+                            nucleo.pattern.reparse(
+                                0,
+                                search_term,
+                                CaseMatching::Ignore,
+                                Normalization::Smart,
+                                false,
+                            );
+                        }
+
                         // The search is initialised here...
-                        nucleo.pattern.reparse(
-                            0,
-                            search_term,
-                            CaseMatching::Ignore,
-                            Normalization::Smart,
-                            false,
-                        );
 
                         // ...but actually begins here
                         let _status = nucleo.tick(500);
@@ -506,37 +370,38 @@ impl Component for Connections {
         let [connections, _viewer] =
             Layout::horizontal([Constraint::Percentage(15), Constraint::Min(1)]).areas(content);
 
-        let widget = Tree::new(&self.items)
-            .expect("all item identifieers are unique")
-            .block(
-                Block::bordered()
-                    .title("Cloud Connections")
-                    .border_style(if focused {
-                        Style::new().blue()
+        match Tree::new(&self.items) {
+            Ok(tree) => {
+                let widget =
+                    tree.block(Block::bordered().title("Cloud Connections").border_style(
+                        if focused {
+                            Style::new().blue()
+                        } else {
+                            Style::default()
+                        },
+                    ))
+                    .highlight_style(if focused {
+                        Style::new()
+                            .fg(Color::Black)
+                            .bg(Color::LightGreen)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default()
-                    }),
-            )
-            .highlight_style(if focused {
-                Style::new()
-                    .fg(Color::Black)
-                    .bg(Color::LightGreen)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            })
-            .experimental_scrollbar(Some(
-                Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
-                    .begin_symbol(None)
-                    .track_symbol(None)
-                    .end_symbol(None),
-            ));
+                    })
+                    .experimental_scrollbar(Some(
+                        Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+                            .begin_symbol(None)
+                            .track_symbol(None)
+                            .end_symbol(None),
+                    ));
 
-        frame.render_widget(Clear, connections);
-        frame.render_stateful_widget(widget, connections, &mut self.state);
-        self.filter.draw(frame, connections, focus)?;
-
-        Ok(())
+                frame.render_widget(Clear, connections);
+                frame.render_stateful_widget(widget, connections, &mut self.state);
+                self.filter.draw(frame, connections, focus)?;
+                Ok(())
+            }
+            Err(_) => Err("all item identifiers need to be unique in connection tree".to_string()),
+        }
     }
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
@@ -556,12 +421,4 @@ impl Component for Connections {
         }
         Ok(())
     }
-}
-
-fn cli_command(program: &str, args: Vec<&str>) -> Vec<u8> {
-    Command::new(program)
-        .args(args)
-        .output()
-        .expect("error processing command")
-        .stdout
 }
