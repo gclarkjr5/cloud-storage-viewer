@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::result::Result;
 use std::time::Duration;
 
@@ -9,7 +10,7 @@ use crate::action::Action;
 use crate::components::error::ErrorComponent;
 use crate::components::footer::Footer;
 use crate::components::Component as Comp;
-use crate::config::Config;
+use crate::config::{cloud_config, Config};
 use crate::tui::Tui;
 
 #[derive(Debug, Clone, Copy)]
@@ -74,14 +75,15 @@ impl App {
                             component.register_config(self.config.clone(), self.focus)?;
                         }
                     }
-                    Action::ListConfiguration(cloud_config, selection, buckets) => {
-                        self.config.cloud_config = cloud_config;
+                    Action::ListConfiguration(cloud_config, buckets) => {
+                        self.config.cloud_config = cloud_config.clone();
                         self.change_focus(Focus::Viewer);
+                        let selection = format!("{}", cloud_config);
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
                             match component.list_item(
                                 buckets.clone(),
-                                selection.clone(),
+                                vec![selection.clone()],
                                 self.focus,
                             ) {
                                 Ok(_) => Ok(()),
@@ -117,19 +119,6 @@ impl App {
                     _ => break,
                 },
             };
-            // if self
-            //     .handle_events()
-            //     .is_ok_and(|action| matches!(action, Action::Quit))
-            // {
-            //     break;
-            // };
-
-            // self.handle_events();
-            // self.handle_actions();
-            // if self.should_quit {
-            //     tui.exit();
-            //     break;
-            // }
         }
 
         tui.exit()?;

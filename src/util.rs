@@ -25,22 +25,6 @@ pub fn add_tree_items(data: Vec<u8>, tree: &mut Tree<String>, node_id: NodeId) {
     });
 }
 
-pub fn find_node_to_append(
-    tree: &mut Tree<String>,
-    path_identifier: &Vec<String>,
-) -> Result<Option<NodeId>, Action> {
-    let selection = path_identifier.last().unwrap();
-    let found_node = tree.nodes().find(|node| node.value() == selection);
-
-    match found_node {
-        Some(node) if node.has_children() => Ok(None),
-        Some(node) => Ok(Some(node.id())),
-        None => {
-            let message = format!("Not able to find tree item at {}", selection);
-            Err(Action::Error(message))
-        }
-    }
-}
 
 pub fn make_tree_items(
     nodes: Nodes<String>,

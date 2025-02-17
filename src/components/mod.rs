@@ -2,6 +2,7 @@ use std::result::Result;
 
 use crate::{action::Action, app::Focus, config::Config};
 use crossterm::event::{KeyEvent, MouseEvent};
+use ego_tree::{NodeId, Tree};
 use ratatui::{layout::Rect, Frame};
 
 pub mod connection_filter;
@@ -54,4 +55,38 @@ pub trait Component {
         // let _foucs = focus;
         Ok(())
     }
+
+    fn find_node_to_append(
+        &mut self,
+        path_identifier: &[String],
+    ) -> Result<Option<NodeId>, Action>
+        // where
+        //     Self: TreeComponent
+    {
+        // let _path_identifier = path_identifier;
+        // Ok(None)
+        let selection = path_identifier.last().unwrap();
+        let tree = self.get_tree();
+        let found_node = tree.nodes().find(|node| node.value() == selection);
+
+        match found_node {
+            Some(node) if node.has_children() => Ok(None),
+            Some(node) => Ok(Some(node.id())),
+            None => {
+                let message = format!("Not able to find tree item at {}", selection);
+                Err(Action::Error(message))
+            }
+        }
+    }
+    fn get_tree(&mut self) -> Tree<String> {
+        Tree::new("this".to_string())
+    }
+
 }
+
+// pub trait TreeComponent {
+//     fn get_tree(&mut self) -> Tree<String> {
+//         Tree::new("this".to_string())
+//     }
+    
+// }

@@ -103,9 +103,13 @@ impl Viewer {
 // }
 
 impl Component for Viewer {
-    fn list_item(&mut self, data: Vec<u8>, path: Vec<String>, focus: Focus) -> Result<(), Action> {
+    fn get_tree(&mut self) -> ETree<String> {
+        self.tree.clone()
+    }
+
+    fn list_item(&mut self, data: Vec<u8>, path_identifier: Vec<String>, focus: Focus) -> Result<(), Action> {
         // find node, verify, unwrap, and set pager
-        let found_node = util::find_node_to_append(&mut self.tree, &path)?;
+        let found_node = self.find_node_to_append(&path_identifier)?;
 
         // if found_node.is_none() {
         //     return Ok(());
@@ -116,7 +120,7 @@ impl Component for Viewer {
         match found_node {
             None => Ok(()),
             Some(node_id) => {
-                let selection = path.last().unwrap();
+                let selection = path_identifier.last().unwrap();
                 let is_directory =
                     selection.chars().last().expect("error getting last char") == '/';
 
@@ -136,13 +140,13 @@ impl Component for Viewer {
                 }
 
                 // remake tree widget
-                self.results_pager.init(&data, path.clone());
+                self.results_pager.init(&data, path_identifier.clone());
                 self.pagers.push(self.results_pager.clone());
                 self.items =
                     util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
 
-                self.state.open(path.clone());
-                self.state.select(path);
+                self.state.open(path_identifier.clone());
+                self.state.select(path_identifier);
 
                 Ok(())
             }

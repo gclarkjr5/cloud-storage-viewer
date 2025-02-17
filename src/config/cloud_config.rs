@@ -51,8 +51,9 @@ impl Default for CloudConfig {
 impl CloudConfig {
     pub fn verify_implemented_cloud_provider(
         &self,
-        cloud_provider: CloudProvider,
+        selection: Vec<String>,
     ) -> Result<CloudProvider, Action> {
+        let cloud_provider = selection[1].clone().into();
         match cloud_provider {
             CloudProvider::Azure(_) => {
                 let message = format!("{} is not implemented yet", cloud_provider);
@@ -143,7 +144,7 @@ impl CloudProvider {
             Self::Azure(_) => Err(Action::Error("Azure not implemented".to_string())),
             Self::Gcs(configs) => {
                 configs.iter().for_each(|config| {
-                    let res = format!("{}/{}", self, config.name.clone());
+                    let res = config.name.to_string();
 
                     tree.get_mut(node_id)
                         .expect("error getting mutable node")

@@ -38,6 +38,7 @@ impl Default for Connections {
     }
 }
 
+
 impl Connections {
     pub fn new() -> Self {
         Self {
@@ -51,36 +52,35 @@ impl Connections {
     }
 
     pub fn activate_connection(&mut self, selection: Vec<String>) -> Result<Action, Action> {
-        let cloud_provider = selection[1].clone().into();
-
         // verify that the selected connection is for an implemented cloud
         // technically should never happen, mainly to see how far development
         // of more cloud implementations has gotten
-        self.config
+        let _cloud_provider = self.config
             .cloud_config
-            .verify_implemented_cloud_provider(cloud_provider)?;
+            .verify_implemented_cloud_provider(selection.clone())?;
 
         // first is the root, second is the cloud provider
         if selection.len() < 3 {
             // then we only have root + provider
-            Ok(Action::Nothing)
+            Err(Action::Error("Cannot activate a Cloud Provider, please select one of its accounts".to_string()))
         } else {
             self.config.cloud_config.activate_config(selection)
         }
     }
+
     pub fn list_cloud_provider(
         &mut self,
         selection: Vec<String>,
         focus: Focus,
     ) -> Result<Action, Action> {
-        let cp = selection[1].clone().into();
         let mut cloud_provider = self
             .config
             .cloud_config
-            .verify_implemented_cloud_provider(cp)?;
+            .verify_implemented_cloud_provider(selection.clone())?;
 
         // find the node to append to
-        let found_node = util::find_node_to_append(&mut self.tree, &selection)?;
+        let found_node = self.find_node_to_append(&selection)?;
+        // let found_node = util::find_node_to_append(&mut self.tree, &selection)?;
 
         // if empty dont do anything
         match found_node {
@@ -96,15 +96,15 @@ impl Connections {
         }
     }
 
-    pub fn list_configuration(&mut self, path: Vec<String>) -> Result<Action, Action> {
+    pub fn list_configuration(&mut self, path_identifier: Vec<String>) -> Result<Action, Action> {
         // set active cloud
-        self.config.cloud_config.activate_config(path)?;
+        self.config.cloud_config.activate_config(path_identifier)?;
 
         let output = util::cli_command("gsutil", &vec!["ls"])?;
 
         Ok(Action::ListConfiguration(
             self.config.cloud_config.clone(),
-            vec![format!("{}", self.config.cloud_config)],
+            // vec![format!("{}", self.config.cloud_config)],
             output,
         ))
     }
@@ -159,6 +159,10 @@ impl Component for Connections {
         self.items = items;
 
         Ok(())
+    }
+
+    fn get_tree(&mut self) -> ETree<String> {
+        self.tree.clone()
     }
 
     fn handle_mouse_event(
