@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::result::Result;
 use std::time::Duration;
 
@@ -10,7 +9,7 @@ use crate::action::Action;
 use crate::components::error::ErrorComponent;
 use crate::components::footer::Footer;
 use crate::components::Component as Comp;
-use crate::config::{cloud_config, Config};
+use crate::config::Config;
 use crate::tui::Tui;
 
 #[derive(Debug, Clone, Copy)]
