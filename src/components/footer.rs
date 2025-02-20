@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::{action::Action, app::Focus, config::Config};
 
-use super::{results_pager::ResultsPager, Component};
+use super::{results_pager::ResultsPager, Component, TreeComponent};
 
 #[derive(Debug, Default)]
 pub struct Footer {
@@ -18,20 +18,15 @@ pub struct Footer {
 }
 
 impl Component for Footer {
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn register_config(&mut self, config: Config, _focus: Focus) -> Result<(), String> {
         self.config = config;
         Ok(())
     }
 
-    fn list_item(
-        &mut self,
-        data: Vec<u8>,
-        _path: Vec<String>,
-        _focus: Focus,
-    ) -> Result<(), Action> {
-        self.results_pager.init(&data, Vec::new());
-        Ok(())
-    }
 
     fn draw(
         &mut self,
@@ -187,6 +182,18 @@ impl Component for Footer {
             );
 
         frame.render_widget(quit_and_close_widget, quit_and_close);
+        Ok(())
+    }
+}
+
+impl TreeComponent for Footer {
+    fn list_item(
+        &mut self,
+        data: Vec<u8>,
+        _path: Vec<String>,
+        _focus: Focus,
+    ) -> Result<(), Action> {
+        self.results_pager.init(&data, Vec::new());
         Ok(())
     }
 }

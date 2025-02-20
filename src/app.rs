@@ -8,7 +8,7 @@ use super::components::viewer::Viewer;
 use crate::action::Action;
 use crate::components::error::ErrorComponent;
 use crate::components::footer::Footer;
-use crate::components::Component as Comp;
+use crate::components::{Component as Comp, TreeComponent};
 use crate::config::Config;
 use crate::tui::Tui;
 
@@ -36,7 +36,6 @@ impl App {
         Self {
             _should_quit: false,
             components: vec![
-                // Box::new(Self::new()),
                 Box::new(Connections::default()),
                 Box::new(Viewer::default()),
                 Box::new(Footer::default()),
@@ -80,17 +79,31 @@ impl App {
                         let selection = format!("{}", cloud_config);
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
-                            match component.list_item(
-                                buckets.clone(),
-                                vec![selection.clone()],
-                                self.focus,
-                            ) {
-                                Ok(_) => Ok(()),
-                                Err(act) => match act {
-                                    Action::Error(e) => Err(e),
-                                    _ => Ok(()),
-                                },
-                            }?;
+                            if let Some(tree_component) = component.as_any_mut().downcast_mut::<Viewer>() {
+                                match tree_component.list_item(
+                                    buckets.clone(),
+                                    vec![selection.clone()],
+                                    self.focus,
+                                ) {
+                                    Ok(_) => Ok(()),
+                                    Err(act) => match act {
+                                        Action::Error(e) => Err(e),
+                                        _ => Ok(()),
+                                    },
+                                }?;
+                            } else if let Some(tree_component) = component.as_any_mut().downcast_mut::<Footer>() {
+                                match tree_component.list_item(
+                                    buckets.clone(),
+                                    vec![selection.clone()],
+                                    self.focus,
+                                ) {
+                                    Ok(_) => Ok(()),
+                                    Err(act) => match act {
+                                        Action::Error(e) => Err(e),
+                                        _ => Ok(()),
+                                    },
+                                }?;
+                            }
                         }
                     }
                     Action::ActivateConfig(cloud_config) => {
@@ -103,7 +116,12 @@ impl App {
                     Action::SelectFilteredItem(item, focus) => {
                         self.change_focus(focus);
                         for component in self.components.iter_mut() {
-                            component.select_item(&item, self.focus)?;
+                            // component.select_item(&item, self.focus)?;
+                            if let Some(tree_component) = component.as_any_mut().downcast_mut::<Connections>() {
+                                tree_component.select_item(&item, self.focus)?;
+                            } else if let Some(tree_component) = component.as_any_mut().downcast_mut::<Viewer>() {
+                                tree_component.select_item(&item, self.focus)?;
+                            }
                         }
                     }
                     _ => (),

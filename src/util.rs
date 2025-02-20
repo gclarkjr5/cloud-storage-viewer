@@ -1,7 +1,6 @@
-use std::io::BufRead;
 use std::process::Command;
 
-use ego_tree::{iter::Nodes, NodeId, NodeRef, Tree};
+use ego_tree::{iter::Nodes, NodeRef};
 use tui_tree_widget::TreeItem;
 
 use crate::{action::Action, app::Focus, components::results_pager::ResultsPager};
@@ -14,15 +13,6 @@ pub fn cli_command(program: &str, args: &Vec<&str>) -> Result<Vec<u8>, Action> {
             Err(Action::Error(message))
         }
     }
-}
-
-pub fn add_tree_items(data: Vec<u8>, tree: &mut Tree<String>, node_id: NodeId) {
-    data.lines().for_each(|listing| {
-        let res = listing.expect("error getting listing");
-        tree.get_mut(node_id)
-            .expect("error getting mutable node")
-            .append(res);
-    });
 }
 
 

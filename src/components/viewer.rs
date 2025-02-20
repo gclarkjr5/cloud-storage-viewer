@@ -1,8 +1,9 @@
+use std::io::BufRead;
 use std::result::Result;
 use std::sync::Arc;
 
 use crossterm::event::{KeyEvent, MouseEventKind};
-use ego_tree::{NodeRef, Tree as ETree};
+use ego_tree::{NodeId, NodeRef, Tree as ETree};
 use nucleo::pattern::{CaseMatching, Normalization};
 use nucleo::{Config as NucleoConfig, Nucleo};
 use ratatui::layout::{Constraint, Layout, Position};
@@ -24,7 +25,7 @@ use crate::util;
 
 use super::results_pager::ResultsPager;
 use super::viewer_filter::ViewerFilter;
-use super::Component;
+use super::{Component, TreeComponent};
 
 pub struct Viewer {
     pub config: Config,
@@ -71,87 +72,14 @@ impl Viewer {
         }
     }
 
-    // pub fn find_node_to_append(&mut self, path: Vec<String>) -> Option<(String, NodeId)> {
-    //     // use the selction to find the node in the tree
-    //     let selection = path.last().unwrap();
-
-    //     let found_node = self.tree.nodes().find(|node| node.value() == selection);
-
-    //     found_node.as_ref()?;
-    //     let node = found_node.expect("error unwrapping found node");
-
-    //     if node.has_children() {
-    //         return None;
-    //     }
-
-    //     // return the selction and the node id
-    //     Some((selection.clone(), node.id()))
-    // }
 }
 
-// pub fn cli_command(program: &str, args: &Vec<&str>) -> Result<Vec<u8>, Action> {
-//     util::cli_command(program, args)
-//     match Command::new(program).args(args).output() {
-//         Ok(output) => Ok(output.stdout),
-//         Err(_) => {
-//             let message = [program.to_string(), args.join(" ")].join(" ");
-//             Err(Action::Error(message))
-//         }
-//     }
-//     // .expect("error processing command")
-//     // .stdout
-// }
 
 impl Component for Viewer {
-    fn get_tree(&mut self) -> ETree<String> {
-        self.tree.clone()
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 
-    fn list_item(&mut self, data: Vec<u8>, path_identifier: Vec<String>, focus: Focus) -> Result<(), Action> {
-        // find node, verify, unwrap, and set pager
-        let found_node = self.find_node_to_append(&path_identifier)?;
-
-        // if found_node.is_none() {
-        //     return Ok(());
-        // }
-
-        // let (selection, node_to_append_to) = found_node.unwrap();
-
-        match found_node {
-            None => Ok(()),
-            Some(node_id) => {
-                let selection = path_identifier.last().unwrap();
-                let is_directory =
-                    selection.chars().last().expect("error getting last char") == '/';
-
-                match is_directory {
-                    true => {
-                        util::add_tree_items(data.clone(), &mut self.tree, node_id);
-                    }
-                    false => {
-                        let root = self.tree.root().value();
-                        match root == selection {
-                            true => {
-                                util::add_tree_items(data.clone(), &mut self.tree, node_id);
-                            }
-                            false => {}
-                        }
-                    }
-                }
-
-                // remake tree widget
-                self.results_pager.init(&data, path_identifier.clone());
-                self.pagers.push(self.results_pager.clone());
-                self.items =
-                    util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-
-                self.state.open(path_identifier.clone());
-                self.state.select(path_identifier);
-
-                Ok(())
-            }
-        }
-    }
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
@@ -339,13 +267,19 @@ impl Component for Viewer {
 
                             data_list.push(data.to_string());
                         }
+
+                        // set filtered items to the data list
                         self.filter.filtered_results.filtered_items = data_list.clone();
-                        self.filter.filtered_results.results = self
-                            .filter
-                            .filtered_results
-                            .results
-                            .clone()
-                            .items(self.filter.filtered_results.filtered_items.clone());
+
+                        // gather the filtered items
+                        let filtered_result_filtered_items = self.filter.filtered_results.filtered_items.clone();
+
+                        // add filtered items to the results.items()
+                        let result_items = self.filter.filtered_results.results.clone().items(filtered_result_filtered_items);
+                        
+                        // set filtered results to the items above
+                        self.filter.filtered_results.results = result_items;
+
                         Ok(Action::Nothing)
                     }
                     _ => Ok(action),
@@ -458,6 +392,52 @@ impl Component for Viewer {
         self.filter.draw(frame, viewer, focus)?;
         Ok(())
     }
+}
+
+impl TreeComponent for Viewer {
+    fn get_tree(&mut self) -> ETree<String> {
+        self.tree.clone()
+    }
+
+    fn list_item(&mut self, data: Vec<u8>, path_identifier: Vec<String>, focus: Focus) -> Result<(), Action> {
+        // find node, verify, unwrap, and set pager
+        let found_node = self.find_node_to_append(&path_identifier)?;
+
+        match found_node {
+            None => Ok(()),
+            Some(node_id) => {
+                let selection = path_identifier.last().unwrap();
+                let is_directory =
+                    selection.chars().last().expect("error getting last char") == '/';
+
+                match is_directory {
+                    true => {
+                        add_tree_items(data.clone(), &mut self.tree, node_id);
+                    }
+                    false => {
+                        let root = self.tree.root().value();
+                        match root == selection {
+                            true => {
+                                add_tree_items(data.clone(), &mut self.tree, node_id);
+                            }
+                            false => {}
+                        }
+                    }
+                }
+
+                // remake tree widget
+                self.results_pager.init(&data, path_identifier.clone());
+                self.pagers.push(self.results_pager.clone());
+                self.items =
+                    util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+
+                self.state.open(path_identifier.clone());
+                self.state.select(path_identifier);
+
+                Ok(())
+            }
+        }
+    }
 
     fn select_item(&mut self, selection: &str, focus: Focus) -> Result<(), String> {
         if matches!(focus, Focus::Viewer) {
@@ -546,6 +526,7 @@ impl Component for Viewer {
         }
         Ok(())
     }
+    
 }
 
 impl Viewer {
@@ -570,4 +551,13 @@ impl Viewer {
             None => None,
         }
     }
+}
+
+pub fn add_tree_items(data: Vec<u8>, tree: &mut ETree<String>, node_id: NodeId) {
+    data.lines().for_each(|listing| {
+        let res = listing.expect("error getting listing");
+        tree.get_mut(node_id)
+            .expect("error getting mutable node")
+            .append(res);
+    });
 }

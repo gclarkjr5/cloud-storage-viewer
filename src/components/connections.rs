@@ -1,6 +1,6 @@
-use super::connection_filter::ConnectionFilter;
+use super::filter::{ConnectionFilter, Filter};
 use super::results_pager::ResultsPager;
-use super::Component;
+use super::{Component, TreeComponent};
 use crossterm::event::{KeyEvent, MouseEventKind};
 use ego_tree::Tree as ETree;
 use nucleo::pattern::{CaseMatching, Normalization};
@@ -22,14 +22,15 @@ use crate::config::Config;
 use crate::key::Key;
 use crate::util;
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Connections {
     pub state: TreeState<String>,
     pub tree: ETree<String>,
     pub items: Vec<TreeItem<'static, String>>,
     pub config: Config,
     pub results_pager: ResultsPager,
-    pub filter: ConnectionFilter,
+    pub filter: Box<dyn Filter>,
+    // pub filter: ConnectionFilter,
 }
 
 impl Default for Connections {
@@ -40,6 +41,27 @@ impl Default for Connections {
 
 
 impl Connections {
+    fn create_tree_item_path(
+        &self,
+        tree_item_path: &mut Vec<String>,
+        selection: Option<&str>,
+    ) -> Option<&String> {
+        // add path
+        tree_item_path.push(selection.unwrap().to_string());
+
+        // find node
+        let parent_node = self
+            .tree
+            .nodes()
+            .find(|node| node.value() == selection.unwrap())
+            .unwrap()
+            .parent();
+
+        match parent_node {
+            Some(parent) => self.create_tree_item_path(tree_item_path, Some(parent.value())),
+            None => None,
+        }
+    }
     pub fn new() -> Self {
         Self {
             state: TreeState::default(),
@@ -47,7 +69,7 @@ impl Connections {
             items: Vec::new(),
             config: Config::default(),
             results_pager: ResultsPager::default(),
-            filter: ConnectionFilter::default(),
+            filter: Box::new(ConnectionFilter::default()),
         }
     }
 
@@ -108,28 +130,13 @@ impl Connections {
             output,
         ))
     }
-
-    // pub fn find_node_to_append(
-    //     &mut self,
-    //     path_identifier: &String,
-    // ) -> Result<Option<NodeId>, Action> {
-    //     let found_node = self
-    //         .tree
-    //         .nodes()
-    //         .find(|node| node.value() == path_identifier);
-
-    //     match found_node {
-    //         Some(node) if node.has_children() => Ok(None),
-    //         Some(node) => Ok(Some(node.id())),
-    //         None => {
-    //             let message = format!("Not able to find tree item at {}", path_identifier);
-    //             Err(Action::Error(message))
-    //         }
-    //     }
-    // }
 }
 
 impl Component for Connections {
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn init(&mut self) -> Result<(), String> {
         let mut tree = ETree::new("Connections".to_string());
 
@@ -161,9 +168,6 @@ impl Component for Connections {
         Ok(())
     }
 
-    fn get_tree(&mut self) -> ETree<String> {
-        self.tree.clone()
-    }
 
     fn handle_mouse_event(
         &mut self,
@@ -264,7 +268,8 @@ impl Component for Connections {
                     }
                 } else if key == self.config.key_config.filter {
                     // activate filter
-                    self.filter.active = !self.filter.active;
+                    // self.filter.active = !self.filter.active;
+                    self.filter.active();
                     Ok(Action::ChangeFocus(Focus::ConnectionsFilter))
                 } else {
                     Ok(Action::Nothing)
@@ -274,12 +279,14 @@ impl Component for Connections {
                 let action = self.filter.handle_key_event(key_event, focus)?;
                 match action {
                     Action::Filter(txt) => {
-                        self.filter.filtered_results.items = self
+                        let tree_items = self
                             .tree
                             .nodes()
-                            .filter(|n| n.value().contains('/'))
+                            .filter(|n| !n.has_children())
                             .map(|n| n.value().to_string())
                             .collect();
+
+                        self.filter.set_filter_result_items(tree_items);
 
                         let number_of_columns = 1;
 
@@ -293,11 +300,10 @@ impl Component for Connections {
                         // Send the strings to search through to the matcher
                         let injector = nucleo.injector();
 
-                        for (id, string) in self
-                            .filter
-                            .filtered_results
-                            .items
-                            .clone()
+                        let filtered_result_items = self.filter.get_filter_result_items();
+
+                        // println!("Filtered result items are {:?}", filtered_result_items);
+                        for (id, string) in filtered_result_items
                             .iter()
                             .enumerate()
                         {
@@ -313,6 +319,7 @@ impl Component for Connections {
                         }
 
                         if let Some(search_term) = txt.last() {
+                        // let search_term = txt.last().unwrap();
                             nucleo.pattern.reparse(
                                 0,
                                 search_term,
@@ -346,13 +353,20 @@ impl Component for Connections {
 
                             data_list.push(data.to_string());
                         }
-                        self.filter.filtered_results.filtered_items = data_list.clone();
-                        self.filter.filtered_results.results = self
-                            .filter
-                            .filtered_results
-                            .results
-                            .clone()
-                            .items(self.filter.filtered_results.filtered_items.clone());
+                        // self.filter.filtered_results.filtered_items = data_list.clone();
+
+                        // set filtered items to the data list
+                        self.filter.set_filter_result_filtered_items(data_list.clone());
+
+                        // gather the filtered items
+                        let filtered_items = self.filter.get_filter_result_filtered_items().clone();
+
+                        // add filtered items to the results.items()
+                        let filter_result_items = self.filter.get_filter_result_results().clone().items(filtered_items.clone());
+
+                        // set filtered results to the items above
+                        self.filter.set_filter_result_results(filter_result_items);
+
                         Ok(Action::Nothing)
                     }
                     _ => Ok(action),
@@ -360,8 +374,7 @@ impl Component for Connections {
             }
             Focus::ConnectionFilterResults => self
                 .filter
-                .filtered_results
-                .handle_key_event(key_event, focus),
+                .filter_results_handle_key_event(key_event, focus),
             _ => Ok(Action::Nothing),
         }
     }
@@ -412,16 +425,29 @@ impl Component for Connections {
         self.config = config;
         self.filter.register_config(self.config.clone(), focus)
     }
-    fn select_item(&mut self, item: &str, focus: Focus) -> Result<(), String> {
+}
+
+impl TreeComponent for Connections {
+    fn get_tree(&mut self) -> ETree<String> {
+        self.tree.clone()
+    }
+
+    fn select_item(&mut self, selection: &str, focus: Focus) -> Result<(), String> {
         if matches!(focus, Focus::Connections) {
-            let mut selection = vec!["Connections".to_string()];
+            let mut tree_item_path: Vec<String> = vec![];
+
+            self.create_tree_item_path(&mut tree_item_path, Some(selection));
+
+            tree_item_path.reverse();
+            // let mut selection = vec!["Connections".to_string()];
 
             // self.filter.active = !self.filter.active;
-            let path = item.split('/').nth(0).unwrap().to_string();
-            selection.push(path);
-            selection.push(item.to_string());
+            self.filter.switch_active_status();
+            // let path = item.split('/').nth(0).unwrap().to_string();
+            // selection.push(path);
+            // selection.push(item.to_string());
 
-            self.state.select(selection);
+            self.state.select(tree_item_path);
         }
         Ok(())
     }

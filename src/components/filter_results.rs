@@ -1,3 +1,4 @@
+use crossterm::event::KeyEvent;
 use ratatui::{
     style::{Color, Modifier, Style, Stylize},
     widgets::{Block, List, ListDirection, ListState},
@@ -6,10 +7,21 @@ use std::result::Result;
 
 use crate::{action::Action, app::Focus, config::Config, key::Key};
 
-use super::Component;
+pub trait FilterResults {
+    fn draw(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect, focus: Focus) -> Result<(), String>;
+    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action>;
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
+    // fn clone_box(&self) -> Box<dyn FilterResults>;
+    fn get_items(&mut self) -> &Vec<String>;
+    fn set_items(&mut self, tree_items: Vec<String>);
+    fn set_filtered_items(&mut self, data_list: Vec<String>);
+    fn get_filtered_items(&mut self) -> &Vec<String>;
+    fn set_results(&mut self, filter_result_items: List<'static>);
+    fn get_results(&mut self) -> &List<'static>;
+}
 
-#[derive(Debug, Default, Clone)]
-pub struct ViewerFilterResults {
+#[derive(Debug, Clone, Default)]
+pub struct ConnectionFilterResults {
     pub config: Config,
     pub items: Vec<String>,
     pub filtered_items: Vec<String>,
@@ -17,9 +29,34 @@ pub struct ViewerFilterResults {
     pub state: ListState,
 }
 
-impl Component for ViewerFilterResults {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
+
+impl FilterResults for ConnectionFilterResults {
+    // fn clone_box(&self) -> Box<dyn FilterResults> {
+    //     Box::new(self.clone())
+    // }
+
+    fn set_items(&mut self, tree_items: Vec<String>) {
+        self.items = tree_items;
+    }
+
+    fn get_items(&mut self) -> &Vec<String> {
+        &self.items
+    }
+
+    fn set_filtered_items(&mut self, data_list: Vec<String>) {
+        self.filtered_items = data_list;
+    }
+
+    fn get_filtered_items(&mut self) -> &Vec<String> {
+        &self.filtered_items
+    }
+
+    fn get_results(&mut self) -> &List<'static> {
+        &self.results
+    }
+
+    fn set_results(&mut self, filter_result_items: List<'static>) {
+        self.results = filter_result_items;
     }
 
     fn draw(
@@ -28,13 +65,13 @@ impl Component for ViewerFilterResults {
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
     ) -> Result<(), String> {
-        let focused = matches!(focus, Focus::ViewerFilterResults);
+        let focused = matches!(focus, Focus::ConnectionFilterResults);
         let list = self
             .results
             .clone()
             .block(
                 Block::bordered()
-                    .title("CloudFS Results Filtered")
+                    .title("Connection Results Filtered")
                     .border_style(if focused {
                         Style::new().blue()
                     } else {
@@ -73,13 +110,13 @@ impl Component for ViewerFilterResults {
     ) -> Result<Action, Action> {
         let key: Key = key_event.into();
         match focus {
-            Focus::ViewerFilterResults => {
+            Focus::ConnectionFilterResults => {
                 if key == self.config.key_config.exit {
                     Ok(Action::Quit)
                 } else if key == self.config.key_config.enter {
                     let item_idx = self.state.selected().unwrap();
                     let item = self.filtered_items[item_idx].clone();
-                    Ok(Action::SelectFilteredItem(item, Focus::Viewer))
+                    Ok(Action::SelectFilteredItem(item, Focus::Connections))
                 } else if [
                     self.config.key_config.key_up,
                     self.config.key_config.arrow_up,
@@ -99,7 +136,7 @@ impl Component for ViewerFilterResults {
                     self.state.select_next();
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.change_focus {
-                    Ok(Action::ChangeFocus(Focus::ViewerFilter))
+                    Ok(Action::ChangeFocus(Focus::ConnectionsFilter))
                 } else {
                     Ok(Action::Nothing)
                 }
@@ -107,4 +144,7 @@ impl Component for ViewerFilterResults {
             _ => Ok(Action::Skip),
         }
     }
+    
 }
+
+
