@@ -23,8 +23,8 @@ use crate::config::Config;
 use crate::key::Key;
 use crate::util;
 
+use super::filter::{Filter, ViewerFilter};
 use super::results_pager::ResultsPager;
-use super::viewer_filter::ViewerFilter;
 use super::{Component, TreeComponent};
 
 pub struct Viewer {
@@ -34,7 +34,7 @@ pub struct Viewer {
     pub items: Vec<TreeItem<'static, String>>,
     pub results_pager: ResultsPager,
     pub pagers: Vec<ResultsPager>,
-    pub filter: ViewerFilter,
+    pub filter: Box<dyn Filter>,
 }
 
 impl Default for Viewer {
@@ -46,7 +46,7 @@ impl Default for Viewer {
             items: Vec::new(),
             results_pager: ResultsPager::default(),
             pagers: Vec::new(),
-            filter: ViewerFilter::default(),
+            filter: Box::new(ViewerFilter::default()),
         }
     }
 }
@@ -79,7 +79,6 @@ impl Component for Viewer {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
-
 
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
@@ -185,7 +184,7 @@ impl Component for Viewer {
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.filter {
                     // activate filter
-                    self.filter.active = !self.filter.active;
+                    self.filter.switch_active_status();
                     Ok(Action::ChangeFocus(Focus::ViewerFilter))
                     // Ok(Some(Action::Nothing))
                 } else {
@@ -196,13 +195,16 @@ impl Component for Viewer {
                 let action = self.filter.handle_key_event(key_event, focus)?;
                 match action {
                     Action::Filter(txt) => {
-                        let search_term = txt.last().unwrap();
-                        self.filter.filtered_results.items = self
+                        // let search_term = txt.last().unwrap();
+                        // self.filter.filtered_results.items =
+                        let tree_items = self
                             .tree
                             .nodes()
                             .filter(|n| n.value().contains('/'))
                             .map(|n| n.value().to_string())
                             .collect();
+
+                        self.filter.set_filter_result_items(tree_items);
 
                         let number_of_columns = 1;
 
@@ -216,11 +218,9 @@ impl Component for Viewer {
                         // Send the strings to search through to the matcher
                         let injector = nucleo.injector();
 
-                        for (id, string) in self
-                            .filter
-                            .filtered_results
-                            .items
-                            .clone()
+                        let filtered_result_items = self.filter.get_filter_result_items();
+
+                        for (id, string) in filtered_result_items
                             .iter()
                             .enumerate()
                         {
@@ -237,13 +237,15 @@ impl Component for Viewer {
 
                         // The search is initialised here...
 
-                        nucleo.pattern.reparse(
-                            0,
-                            search_term,
-                            CaseMatching::Ignore,
-                            Normalization::Smart,
-                            false,
-                        );
+                        if let Some(search_term) = txt.last() {
+                            nucleo.pattern.reparse(
+                                0,
+                                search_term,
+                                CaseMatching::Ignore,
+                                Normalization::Smart,
+                                false,
+                            );
+                        }
 
                         // ...but actually begins here
                         let _status = nucleo.tick(500);
@@ -269,16 +271,16 @@ impl Component for Viewer {
                         }
 
                         // set filtered items to the data list
-                        self.filter.filtered_results.filtered_items = data_list.clone();
+                        self.filter.set_filter_result_filtered_items(data_list.clone());
 
                         // gather the filtered items
-                        let filtered_result_filtered_items = self.filter.filtered_results.filtered_items.clone();
+                        let filtered_items = self.filter.get_filter_result_filtered_items().clone();
 
                         // add filtered items to the results.items()
-                        let result_items = self.filter.filtered_results.results.clone().items(filtered_result_filtered_items);
+                        let filter_result_items = self.filter.get_filter_result_results().clone().items(filtered_items.clone());
                         
                         // set filtered results to the items above
-                        self.filter.filtered_results.results = result_items;
+                        self.filter.set_filter_result_results(filter_result_items);
 
                         Ok(Action::Nothing)
                     }
@@ -287,8 +289,7 @@ impl Component for Viewer {
             }
             Focus::ViewerFilterResults => self
                 .filter
-                .filtered_results
-                .handle_key_event(key_event, focus),
+                .filter_results_handle_key_event(key_event, focus),
             _ => Ok(Action::Skip),
         }
     }
@@ -521,36 +522,12 @@ impl TreeComponent for Viewer {
             // set results pager to that parent
             // get idx of selection within parent
 
-            self.filter.active = !self.filter.active;
+            self.filter.switch_active_status();
             self.state.select(tree_item_path);
         }
         Ok(())
     }
     
-}
-
-impl Viewer {
-    fn create_tree_item_path(
-        &self,
-        tree_item_path: &mut Vec<String>,
-        selection: Option<&str>,
-    ) -> Option<&String> {
-        // add path
-        tree_item_path.push(selection.unwrap().to_string());
-
-        // find node
-        let parent_node = self
-            .tree
-            .nodes()
-            .find(|node| node.value() == selection.unwrap())
-            .unwrap()
-            .parent();
-
-        match parent_node {
-            Some(parent) => self.create_tree_item_path(tree_item_path, Some(parent.value())),
-            None => None,
-        }
-    }
 }
 
 pub fn add_tree_items(data: Vec<u8>, tree: &mut ETree<String>, node_id: NodeId) {

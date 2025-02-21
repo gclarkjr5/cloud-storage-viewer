@@ -35,34 +35,6 @@ pub struct Connections {
 
 impl Default for Connections {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-
-impl Connections {
-    fn create_tree_item_path(
-        &self,
-        tree_item_path: &mut Vec<String>,
-        selection: Option<&str>,
-    ) -> Option<&String> {
-        // add path
-        tree_item_path.push(selection.unwrap().to_string());
-
-        // find node
-        let parent_node = self
-            .tree
-            .nodes()
-            .find(|node| node.value() == selection.unwrap())
-            .unwrap()
-            .parent();
-
-        match parent_node {
-            Some(parent) => self.create_tree_item_path(tree_item_path, Some(parent.value())),
-            None => None,
-        }
-    }
-    pub fn new() -> Self {
         Self {
             state: TreeState::default(),
             tree: ETree::new(String::new()),
@@ -72,7 +44,10 @@ impl Connections {
             filter: Box::new(ConnectionFilter::default()),
         }
     }
+}
 
+
+impl Connections {
     pub fn activate_connection(&mut self, selection: Vec<String>) -> Result<Action, Action> {
         // verify that the selected connection is for an implemented cloud
         // technically should never happen, mainly to see how far development
@@ -269,7 +244,7 @@ impl Component for Connections {
                 } else if key == self.config.key_config.filter {
                     // activate filter
                     // self.filter.active = !self.filter.active;
-                    self.filter.active();
+                    self.filter.switch_active_status();
                     Ok(Action::ChangeFocus(Focus::ConnectionsFilter))
                 } else {
                     Ok(Action::Nothing)
@@ -439,13 +414,7 @@ impl TreeComponent for Connections {
             self.create_tree_item_path(&mut tree_item_path, Some(selection));
 
             tree_item_path.reverse();
-            // let mut selection = vec!["Connections".to_string()];
-
-            // self.filter.active = !self.filter.active;
             self.filter.switch_active_status();
-            // let path = item.split('/').nth(0).unwrap().to_string();
-            // selection.push(path);
-            // selection.push(item.to_string());
 
             self.state.select(tree_item_path);
         }
