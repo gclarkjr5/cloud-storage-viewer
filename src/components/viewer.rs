@@ -1,11 +1,8 @@
 use std::io::BufRead;
 use std::result::Result;
-use std::sync::Arc;
 
 use crossterm::event::{KeyEvent, MouseEventKind};
 use ego_tree::{NodeId, NodeRef, Tree as ETree};
-use nucleo::pattern::{CaseMatching, Normalization};
-use nucleo::{Config as NucleoConfig, Nucleo};
 use ratatui::layout::{Constraint, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::Span;
@@ -195,8 +192,6 @@ impl Component for Viewer {
                 let action = self.filter.handle_key_event(key_event, focus)?;
                 match action {
                     Action::Filter(txt) => {
-                        // let search_term = txt.last().unwrap();
-                        // self.filter.filtered_results.items =
                         let tree_items = self
                             .tree
                             .nodes()
@@ -204,85 +199,7 @@ impl Component for Viewer {
                             .map(|n| n.value().to_string())
                             .collect();
 
-                        self.filter.set_filter_result_items(tree_items);
-
-                        let number_of_columns = 1;
-
-                        let mut nucleo = Nucleo::new(
-                            NucleoConfig::DEFAULT,
-                            Arc::new(|| {}),
-                            None,
-                            number_of_columns,
-                        );
-
-                        // Send the strings to search through to the matcher
-                        let injector = nucleo.injector();
-
-                        let filtered_result_items = self.filter.get_filter_result_items();
-
-                        for (id, string) in filtered_result_items
-                            .iter()
-                            .enumerate()
-                        {
-                            // Only the strings assigned to row in the closure below are matched on,
-                            // so it's possible to pass an identifier in.
-                            let item = (id, string.to_owned());
-
-                            injector.push(item, |(_id, string), row| {
-                                // The size of this array is determined by number_of_columns
-                                let str_clone = string.clone();
-                                row[0] = str_clone.into()
-                            });
-                        }
-
-                        // The search is initialised here...
-
-                        if let Some(search_term) = txt.last() {
-                            nucleo.pattern.reparse(
-                                0,
-                                search_term,
-                                CaseMatching::Ignore,
-                                Normalization::Smart,
-                                false,
-                            );
-                        }
-
-                        // ...but actually begins here
-                        let _status = nucleo.tick(500);
-                        // if status.changed {
-                        //     println!("There are new results.")
-                        // }
-                        // if !status.running {
-                        //     println!("The search has finished.")
-                        // }
-
-                        // Snapshot contains the current set of results
-                        let snapshot = nucleo.snapshot();
-
-                        // Matching items are returned, ranked by highest score first.
-                        // These are just the items as pushed to the injector earlier.
-                        let matches: Vec<_> = snapshot.matched_items(..).collect();
-
-                        let mut data_list: Vec<String> = vec![];
-                        for item in matches {
-                            let (_, data) = item.data;
-
-                            data_list.push(data.to_string());
-                        }
-
-                        // set filtered items to the data list
-                        self.filter.set_filter_result_filtered_items(data_list.clone());
-
-                        // gather the filtered items
-                        let filtered_items = self.filter.get_filter_result_filtered_items().clone();
-
-                        // add filtered items to the results.items()
-                        let filter_result_items = self.filter.get_filter_result_results().clone().items(filtered_items.clone());
-                        
-                        // set filtered results to the items above
-                        self.filter.set_filter_result_results(filter_result_items);
-
-                        Ok(Action::Nothing)
+                        self.filter.engage_filter(txt, tree_items)
                     }
                     _ => Ok(action),
                 }
@@ -375,7 +292,11 @@ impl Component for Viewer {
             // self.results_pager.paged_item.last().unwrap(),
             self.results_pager.page_idx + 1,
             self.results_pager.num_pages,
-            self.results_pager.results_per_page,
+            // self.results_pager.results_per_page,
+            match self.results_pager.page_idx {
+                0 => format!("{}-{}", 0, ((self.results_pager.page_idx + 1) * self.results_pager.results_per_page)),
+                _ => format!("{}-{}", ((self.results_pager.page_idx + 1) * self.results_pager.results_per_page) + 1, ((self.results_pager.page_idx + 2) * self.results_pager.results_per_page)),
+            },
             self.results_pager.total_results,
         );
         #[allow(clippy::cast_possible_truncation)]

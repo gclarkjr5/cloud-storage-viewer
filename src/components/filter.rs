@@ -1,4 +1,7 @@
+use std::sync::Arc;
 use crossterm::event::KeyEvent;
+use nucleo::pattern::{CaseMatching, Normalization};
+use nucleo::{Config as NucleoConfig, Nucleo};
 use ratatui::{
     layout::{Constraint, Layout},
     style::{Color, Style, Stylize},
@@ -11,11 +14,85 @@ use crate::{action::Action, app::Focus, config::Config, key::Key};
 
 use super::filter_results::{ConnectionFilterResults, FilterResults, ViewerFilterResults};
 
-
 pub trait Filter {
-    fn draw(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect, focus: Focus) -> Result<(), String>;
-    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action>;
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
+    fn default() -> Self where Self: Sized;
+    fn engage_filter(&mut self, txt: Vec<String>, tree_items: Vec<String>) -> Result<Action, Action> {
+        self.set_filter_result_items(tree_items);
+
+        let number_of_columns = 1;
+
+        let mut nucleo = Nucleo::new(
+            NucleoConfig::DEFAULT,
+            Arc::new(|| {}),
+            None,
+            number_of_columns,
+        );
+
+        // Send the strings to search through to the matcher
+        let injector = nucleo.injector();
+
+        let filtered_result_items = self.get_filter_result_items();
+
+        for (id, string) in filtered_result_items
+            .iter()
+            .enumerate()
+        {
+            // Only the strings assigned to row in the closure below are matched on,
+            // so it's possible to pass an identifier in.
+            let item = (id, string.to_owned());
+
+            injector.push(item, |(_id, string), row| {
+                // The size of this array is determined by number_of_columns
+                let str_clone = string.clone();
+                row[0] = str_clone.into()
+            });
+        }
+
+        if let Some(search_term) = txt.last() {
+            nucleo.pattern.reparse(
+                0,
+                search_term,
+                CaseMatching::Ignore,
+                Normalization::Smart,
+                false,
+            );
+        }
+
+        // The search is initialised here...
+
+        // ...but actually begins here
+        let _status = nucleo.tick(500);
+
+        // Snapshot contains the current set of results
+        let snapshot = nucleo.snapshot();
+
+        // Matching items are returned, ranked by highest score first.
+        // These are just the items as pushed to the injector earlier.
+        let matches: Vec<_> = snapshot.matched_items(..).collect();
+
+        let mut data_list: Vec<String> = vec![];
+        for item in matches {
+            let (_, data) = item.data;
+
+            data_list.push(data.to_string());
+        }
+
+        // set filtered items to the data list
+        self.set_filter_result_filtered_items(data_list.clone());
+
+        // gather the filtered items
+        let filtered_items = self.get_filter_result_filtered_items().clone();
+
+        // add filtered items to the results.items()
+        let filter_result_items = self.get_filter_result_results().clone().items(filtered_items.clone());
+
+        // set filtered results to the items above
+        self.set_filter_result_results(filter_result_items);
+
+        Ok(Action::Nothing)
+        
+    }
+    fn switch_active_status(&mut self);
     fn get_filter_result_items(&mut self) -> &Vec<String>;
     fn set_filter_result_items(&mut self, tree_items: Vec<String>);
     fn set_filter_result_filtered_items(&mut self, data_list: Vec<String>);
@@ -23,10 +100,10 @@ pub trait Filter {
     fn get_filter_result_results(&mut self) -> &List<'static>;
     fn set_filter_result_results(&mut self, filter_result_items: List<'static>);
     fn filter_results_handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action>;
-    fn switch_active_status(&mut self);
-    fn default() -> Self where Self: Sized;
+    fn draw(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect, focus: Focus) -> Result<(), String>;
+    fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action>;
+    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
 } 
-
 
 pub struct ConnectionFilter {
     pub config: Config,
@@ -46,6 +123,10 @@ pub struct ViewerFilter {
 impl Filter for ConnectionFilter {
     fn default() -> Self where Self: Sized {
         Self { config: Config::default(), active: false, textarea: TextArea::default(), filtered_results: Box::new(ConnectionFilterResults::default()) }
+    }
+
+    fn switch_active_status(&mut self) {
+        self.active = !self.active;
     }
 
     fn set_filter_result_items(&mut self, tree_items: Vec<String>) {
@@ -74,10 +155,6 @@ impl Filter for ConnectionFilter {
 
     fn filter_results_handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
         self.filtered_results.handle_key_event(key_event, focus)
-    }
-
-    fn switch_active_status(&mut self) {
-        self.active = !self.active;
     }
 
     fn draw(
