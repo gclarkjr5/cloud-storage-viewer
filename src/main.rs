@@ -29,9 +29,10 @@ fn main() -> Result<(), String> {
 }
 
 // GCS structure
-// // Project/Account -- gcloud config configurations list, activate, create
-// // // Buckets -- gsutil ls
-// // // // Filesystem -- gsutil ls {bucket} ...
+// Accounts (TODO) -- gcloud auth list (credntiated accounts), gcloud config set account {account}
+// // // Projects -- gcloud config configurations list, activate, create
+// // // // Buckets -- gsutil ls
+// // // // // Filesystem -- gsutil ls {bucket} ...
 
 // Azure structure
 // // Azure Subscription -- az account list, set --subscription, `cannot create`
