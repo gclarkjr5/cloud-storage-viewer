@@ -35,6 +35,7 @@ fn main() -> Result<(), String> {
 
 // Azure structure
 // // Azure Subscription -- az account list, set --subscription, `cannot create`
+// // // Storage Accounts -- az storage account list --subscription {subscription} --query '[].name' --output yaml
 // // // Resource Groups -- az group list
 // // // // Storage Account -- az storage account list
 // // // // // Containers -- [az storage account keys list -n {account_name}, az storage container list --account-name {name} --account-key {key}]

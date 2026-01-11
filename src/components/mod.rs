@@ -18,10 +18,11 @@ pub mod viewer;
 // pub mod viewer_filter;
 // pub mod viewer_filter_results;
 
-pub trait Component {
+pub trait Component: std::fmt::Debug {
     fn init(&mut self) -> Result<(), String> {
         Ok(())
     }
+    fn name(&self) -> &str;
     fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<(), String>;
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
         let _key_event = key_event;
@@ -95,3 +96,4 @@ pub trait TreeComponent {
         
     }
 }
+

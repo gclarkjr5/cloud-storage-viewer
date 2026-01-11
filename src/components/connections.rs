@@ -9,6 +9,7 @@ use ratatui::widgets::block::Block;
 use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 
 use ratatui::Frame;
+use tracing::{info, error};
 use std::result::Result;
 use std::vec;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
@@ -16,9 +17,11 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 use crate::action::Action;
 use crate::app::Focus;
 use crate::config::Config;
+use crate::config::cloud_config::CloudProvider;
 use crate::key::Key;
 use crate::util;
 
+#[derive(Debug)]
 pub struct Connections {
     pub state: TreeState<String>,
     pub tree: ETree<String>,
@@ -44,31 +47,36 @@ impl Default for Connections {
 
 impl Connections {
     pub fn activate_connection(&mut self, selection: Vec<String>) -> Result<Action, Action> {
+        info!("User Request: Activate {selection:?}.");
         // verify that the selected connection is for an implemented cloud
         // technically should never happen, mainly to see how far development
         // of more cloud implementations has gotten
-        let _cloud_provider = self.config
+        self.config
             .cloud_config
-            .verify_implemented_cloud_provider(selection.clone())?;
+            .verify_implemented_cloud_provider(selection[1].clone())?;
 
         // first is the root, second is the cloud provider
         if selection.len() < 3 {
             // then we only have root + provider
-            Err(Action::Error("Cannot activate a Cloud Provider, please select one of its accounts".to_string()))
+            let msg = "Can ONLY activate an account within a Cloud Provider. Please select one.";
+            error!(msg);
+            Err(Action::Error(msg.to_string()))
         } else {
             self.config.cloud_config.activate_config(selection)
         }
     }
 
+    // pub fn ls(
     pub fn list_cloud_provider(
         &mut self,
         selection: Vec<String>,
         focus: Focus,
     ) -> Result<Action, Action> {
-        let mut cloud_provider = self
+        let cloud_provider_selection: String = selection[1].clone();
+        self
             .config
             .cloud_config
-            .verify_implemented_cloud_provider(selection.clone())?;
+            .verify_implemented_cloud_provider(cloud_provider_selection.clone())?;
 
         // find the node to append to
         let found_node = self.find_node_to_append(&selection)?;
@@ -77,7 +85,12 @@ impl Connections {
         match found_node {
             None => Ok(Action::Nothing),
             Some(nid) => {
-                cloud_provider.update()?;
+                let cp = &selection[1];
+                info!("Requesting to list connections for {cp:?}");
+
+                let cloud_provider = self.config.cloud_config.get_cloud_provider(cloud_provider_selection).expect("Error returning cloud provider from conns");
+                cloud_provider.update_accounts()?;
+                info!("Updated accounts. Config now: {cloud_provider:?}");
                 cloud_provider.create_nodes(&mut self.tree, nid)?;
                 self.items =
                     util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
@@ -91,6 +104,7 @@ impl Connections {
         // set active cloud
         self.config.cloud_config.activate_config(path_identifier)?;
 
+        // list items
         let output = util::cli_command("gsutil", &vec!["ls"])?;
 
         Ok(Action::ListConfiguration(
@@ -101,6 +115,9 @@ impl Connections {
 }
 
 impl Component for Connections {
+    fn name(&self) -> &str {
+        "Connections"
+    }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }

@@ -18,6 +18,9 @@ pub struct Footer {
 }
 
 impl Component for Footer {
+    fn name(&self) -> &str {
+        "Footer"
+    }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }

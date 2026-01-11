@@ -7,7 +7,7 @@ use std::result::Result;
 
 use crate::{action::Action, app::Focus, config::Config, key::Key};
 
-pub trait FilterResults {
+pub trait FilterResults: std::fmt::Debug {
     fn draw(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect, focus: Focus) -> Result<(), String>;
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action>;
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;

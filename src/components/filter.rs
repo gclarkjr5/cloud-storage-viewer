@@ -14,7 +14,7 @@ use crate::{action::Action, app::Focus, config::Config, key::Key};
 
 use super::filter_results::{ConnectionFilterResults, FilterResults, ViewerFilterResults};
 
-pub trait Filter {
+pub trait Filter: std::fmt::Debug {
     fn default() -> Self where Self: Sized;
     fn engage_filter(&mut self, txt: Vec<String>, tree_items: Vec<String>) -> Result<Action, Action> {
         self.set_filter_result_items(tree_items);
@@ -105,6 +105,7 @@ pub trait Filter {
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
 } 
 
+#[derive(Debug)]
 pub struct ConnectionFilter {
     pub config: Config,
     pub active: bool,
@@ -112,6 +113,7 @@ pub struct ConnectionFilter {
     pub filtered_results: Box<dyn FilterResults>,
 }
 
+#[derive(Debug)]
 pub struct ViewerFilter {
     pub config: Config,
     pub active: bool,

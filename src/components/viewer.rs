@@ -12,6 +12,7 @@ use ratatui::{
     widgets::{Block, Scrollbar, ScrollbarOrientation},
     Frame,
 };
+use tracing::info;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::action::Action;
@@ -24,6 +25,7 @@ use super::filter::{Filter, ViewerFilter};
 use super::results_pager::ResultsPager;
 use super::{Component, TreeComponent};
 
+#[derive(Debug)]
 pub struct Viewer {
     pub config: Config,
     pub state: TreeState<String>,
@@ -52,6 +54,7 @@ impl Viewer {
     pub fn increase_results_page(&mut self) -> Option<()> {
         // only increase page idx if we are on a page less than the number of pages
         if self.results_pager.page_idx + 1 < self.results_pager.num_pages {
+            info!("Going up a page.");
             self.results_pager.page_idx += 1;
             Some(())
         } else {
@@ -62,6 +65,7 @@ impl Viewer {
     pub fn decrease_results_page(&mut self) -> Option<()> {
         // only decrease page idx if we are on a page higher than 1
         if self.results_pager.page_idx + 1 > 1 {
+            info!("Going down a page.");
             self.results_pager.page_idx -= 1;
             Some(())
         } else {
@@ -73,6 +77,9 @@ impl Viewer {
 
 
 impl Component for Viewer {
+    fn name(&self) -> &str {
+        "Viewer"
+    }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
@@ -338,12 +345,17 @@ impl TreeComponent for Viewer {
                     }
                     false => {
                         let root = self.tree.root().value();
-                        match root == selection {
-                            true => {
-                                add_tree_items(data.clone(), &mut self.tree, node_id);
-                            }
-                            false => {}
+                        if root == selection {
+                            
+                            add_tree_items(data.clone(), &mut self.tree, node_id);
+                        } else {
+                            {}
                         }
+                        // match root == selection {
+                        //     true => {
+                        //     }
+                        //     false => {}
+                        // }
                     }
                 }
 

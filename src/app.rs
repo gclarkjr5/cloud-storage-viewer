@@ -2,6 +2,7 @@ use std::result::Result;
 use std::time::Duration;
 
 use crossterm::event::{Event, KeyEvent, MouseEvent};
+use tracing::info;
 
 use super::components::connections::Connections;
 use super::components::viewer::Viewer;
@@ -48,6 +49,7 @@ impl App {
 
     pub fn run(&mut self) -> Result<(), String> {
         // start the TUI
+        info!("Cloud Storage Viewer TUI started");
         let mut tui = Tui::new()?;
         tui.enter()?;
         tui.clear()?;
@@ -55,6 +57,9 @@ impl App {
         for component in self.components.iter_mut() {
             component.register_config(self.config.clone(), self.focus)?;
             component.init()?;
+
+            let component_name = &component.name();
+            info!("Initialized and registerd default config for component {component_name:?}");
         }
 
         // time to work
@@ -189,6 +194,8 @@ impl App {
     }
 
     pub fn change_focus(&mut self, focus: Focus) {
+        let initial_focus = self.focus;
+        info!("Changing focus from {initial_focus:?} to {focus:?}");
         self.focus = focus;
     }
 
