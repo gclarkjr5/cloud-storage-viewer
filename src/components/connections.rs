@@ -47,13 +47,8 @@ impl Default for Connections {
 
 impl Connections {
     pub fn activate_connection(&mut self, selection: Vec<String>) -> Result<Action, Action> {
-        info!("User Request: Activate {selection:?}.");
-        // verify that the selected connection is for an implemented cloud
-        // technically should never happen, mainly to see how far development
-        // of more cloud implementations has gotten
-        self.config
-            .cloud_config
-            .verify_implemented_cloud_provider(selection[1].clone())?;
+        let request_path = &selection[1..];
+        info!("User Request: Activate Connection {request_path:?}.");
 
         // first is the root, second is the cloud provider
         if selection.len() < 3 {
@@ -72,28 +67,40 @@ impl Connections {
         selection: Vec<String>,
         focus: Focus,
     ) -> Result<Action, Action> {
+        let request_path = &selection[1..];
+        info!("User Request: List Connections for {request_path:?}");
+
         let cloud_provider_selection: String = selection[1].clone();
+        // verify that the selected connection is for an implemented cloud
+        // technically should never happen, mainly to see how far development
+        // of more cloud implementations has gotten
         self
             .config
             .cloud_config
             .verify_implemented_cloud_provider(cloud_provider_selection.clone())?;
 
         // find the node to append to
+        info!("Searching for Tree Node to append to {request_path:?}");
         let found_node = self.find_node_to_append(&selection)?;
 
         // if empty dont do anything
         match found_node {
-            None => Ok(Action::Nothing),
+            None => {
+                info!("No Tree Node Identified");
+                Ok(Action::Nothing)
+            },
             Some(nid) => {
-                let cp = &selection[1];
-                info!("Requesting to list connections for {cp:?}");
+                info!("Tree Node Identified");
 
                 let cloud_provider = self.config.cloud_config.get_cloud_provider(cloud_provider_selection).expect("Error returning cloud provider from conns");
-                cloud_provider.update_accounts()?;
-                info!("Updated accounts. Config now: {cloud_provider:?}");
+                cloud_provider.list_accounts()?;
+                info!("Creating Stateful Tree for {request_path:?}");
                 cloud_provider.create_nodes(&mut self.tree, nid)?;
+                info!("Connection Tree Nodes created");
+
                 self.items =
                     util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
+                info!("Recursive Tree Nodes created");
                 self.state.open(selection.clone());
                 Ok(Action::Nothing)
             }
