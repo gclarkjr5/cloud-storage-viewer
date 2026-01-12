@@ -69,8 +69,6 @@ impl Connections {
                 Ok(Action::ActivateConfig(self.config.cloud_provider_config.clone()))
                 
             }
-            // info!("Activating, but not yet");
-            // Err(Action::Error("Not implemented".to_string()))
         }
     }
 
@@ -92,7 +90,7 @@ impl Connections {
         self
             .config
             .cloud_provider_config
-            .verify_implemented_cloud_provider(cloud_provider.clone())?;
+            .verify_implemented_cloud_provider(&cloud_provider)?;
 
         // find the node to append to
         info!("Searching for Tree Node to append to {request_path:?}");
