@@ -3,11 +3,14 @@ use std::io::BufRead;
 use std::process::Command;
 use std::result::Result;
 
+pub mod cloud_provider_kind;
+pub mod cloud_provider_connection; 
+
 use tracing::{error, info};
 
 use crate::action::Action;
-use crate::config::cloud_connection::{AzureConfig, CloudConnection, GcsConfig, S3Config};
-use crate::config::cloud_provider_kind::CloudProviderKind;
+use cloud_provider_connection::{AzureConfig, CloudConnection, GcsConfig, S3Config};
+use cloud_provider_kind::CloudProviderKind;
 use crate::util;
 
 #[derive(Debug, Clone)]
@@ -221,6 +224,34 @@ impl CloudProviderConfig {
                 let message = format!("{} is not implemented yet", cloud_provider_kind);
                 error!("{message:?}");
                 Err(Action::Error(message))
+            }
+        }
+    }
+
+    pub fn ls(&mut self, cloud_provider_kind: &CloudProviderKind, account: Option<String>) -> Result<Action, Action> {
+        // an account must exist in the selection
+        if account.is_none() {
+            return Err(Action::Error("Only Connections/Accounts can be listed".to_string()))
+        }
+        // activate the account requested
+        self.activate(cloud_provider_kind, account)?;
+
+        // do the listing
+        match &self.active_cloud_connection {
+            None => Ok(Action::Nothing),
+            Some(cloud_connection) => {
+                match cloud_connection {
+                    CloudConnection::S3(_conf) => Err(Action::Error("Not implemented yet".to_string())),
+                    CloudConnection::Azure(_conf) =>{
+                        // conf.ls();
+                        Ok(Action::Nothing)
+                    }
+                    CloudConnection::Gcs(_conf) => {
+                        // conf.ls();
+                        Ok(Action::Nothing)
+                        
+                    }
+                }
             }
         }
     }

@@ -17,7 +17,7 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 use crate::action::Action;
 use crate::app::Focus;
 use crate::config::Config;
-use crate::config::cloud_provider_kind::CloudProviderKind;
+use crate::config::cloud_provider_config::cloud_provider_kind::CloudProviderKind;
 use crate::key::Key;
 use crate::util;
 

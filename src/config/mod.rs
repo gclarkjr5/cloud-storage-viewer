@@ -3,9 +3,7 @@ use key_config::KeyConfig;
 
 
 pub mod cloud_provider_config;
-pub mod cloud_connection;
 pub mod key_config;
-pub mod cloud_provider_kind;
 
 #[derive(Debug, Clone, Default)]
 pub struct Config {
