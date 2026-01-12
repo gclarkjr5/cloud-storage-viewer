@@ -1,10 +1,11 @@
 use cloud_provider_config::CloudProviderConfig;
 use key_config::KeyConfig;
 
-use crate::{action::Action, config::cloud_provider_config::CloudProvider};
 
 pub mod cloud_provider_config;
+pub mod cloud_connection;
 pub mod key_config;
+pub mod cloud_provider_kind;
 
 #[derive(Debug, Clone, Default)]
 pub struct Config {
@@ -22,7 +23,7 @@ fn is_directory(loc: &str) -> bool {
 }
 
 pub trait CloudFS {
-    fn verify_cli_tooling(&self, selection: Vec<String>) -> Result<CloudProvider, Action>;
+    // fn verify_cli_tooling(&self, selection: Vec<String>) -> Result<CloudProvider, Action>;
     // list available connections for a give cloud provider
     // GCP -> Projects
     // Azure -> Subscriptions

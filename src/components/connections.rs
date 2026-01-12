@@ -2,14 +2,14 @@ use super::filter::{ConnectionFilter, Filter};
 use super::results_pager::ResultsPager;
 use super::{Component, TreeComponent};
 use crossterm::event::{KeyEvent, MouseEventKind};
-use ego_tree::Tree as ETree;
+use ego_tree::{NodeId, Tree as ETree};
 use ratatui::layout::{Constraint, Layout, Position, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::widgets::block::Block;
 use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 
 use ratatui::Frame;
-use tracing::{info, error};
+use tracing::{info};
 use std::result::Result;
 use std::vec;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
@@ -17,6 +17,7 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 use crate::action::Action;
 use crate::app::Focus;
 use crate::config::Config;
+use crate::config::cloud_provider_kind::CloudProviderKind;
 use crate::key::Key;
 use crate::util;
 
@@ -45,18 +46,31 @@ impl Default for Connections {
 
 
 impl Connections {
-    pub fn activate_connection(&mut self, selection: Vec<String>) -> Result<Action, Action> {
+    pub fn activate(&mut self, selection: Vec<String>) -> Result<Action, Action> {
+        // Remove Connections
+        // first is Cloud Provider, then account (GCS/account_1, Azure/account_0, etc.)
         let request_path = &selection[1..];
         info!("User Request: Activate Connection {request_path:?}.");
 
-        // first is the root, second is the cloud provider
-        if selection.len() < 3 {
-            // then we only have root + provider
-            let msg = "Can ONLY activate an account within a Cloud Provider. Please select one.";
-            error!(msg);
-            Err(Action::Error(msg.to_string()))
+        if request_path.is_empty() {
+            // User tried to activate "Connections", do Nothing
+            Ok(Action::Nothing)
         } else {
-            self.config.cloud_provider_config.activate_config(selection)
+            // if the user tries to activate the cloud provider, then we will activate the cloud
+            // provider and the currently active account for it
+            let cloud_provider: CloudProviderKind = request_path[0].clone().into();
+            if request_path.len() == 1 {
+                
+                self.config.cloud_provider_config.activate(&cloud_provider, None)?;
+                Ok(Action::ActivateConfig(self.config.cloud_provider_config.clone()))
+            } else {
+                let account = request_path[1].to_string();
+                self.config.cloud_provider_config.activate(&cloud_provider, Some(account))?;
+                Ok(Action::ActivateConfig(self.config.cloud_provider_config.clone()))
+                
+            }
+            // info!("Activating, but not yet");
+            // Err(Action::Error("Not implemented".to_string()))
         }
     }
 
@@ -70,13 +84,15 @@ impl Connections {
         info!("User Request: List Connections for {request_path:?}");
 
         let cloud_provider_selection: String = selection[1].clone();
+        let cloud_provider: CloudProviderKind = cloud_provider_selection.into();
+
         // verify that the selected connection is for an implemented cloud
         // technically should never happen, mainly to see how far development
         // of more cloud implementations has gotten
         self
             .config
             .cloud_provider_config
-            .verify_implemented_cloud_provider(cloud_provider_selection.clone())?;
+            .verify_implemented_cloud_provider(cloud_provider.clone())?;
 
         // find the node to append to
         info!("Searching for Tree Node to append to {request_path:?}");
@@ -91,10 +107,16 @@ impl Connections {
             Some(nid) => {
                 info!("Tree Node Identified");
 
-                let cloud_provider = self.config.cloud_provider_config.get_cloud_provider(cloud_provider_selection).expect("Error returning cloud provider from conns");
-                cloud_provider.list_accounts()?;
+                // let cloud_provider = self.config.cloud_provider_config.get_cloud_provider(cloud_provider).expect("Error returning cloud provider from conns");
+
+                self.config.cloud_provider_config.list_connections(&cloud_provider)?;
                 info!("Creating Stateful Tree for {request_path:?}");
-                cloud_provider.create_nodes(&mut self.tree, nid)?;
+
+                self.create_nodes(nid, &cloud_provider)?;
+                // self.config.cloud_provider_config.create_nodes(&mut self.tree, nid, &cloud_provider)
+                // cloud_provider.create_nodes(&mut self.tree, nid)?;
+
+
                 info!("Connection Tree Nodes created");
 
                 self.items =
@@ -106,9 +128,39 @@ impl Connections {
         }
     }
 
-    pub fn list_configuration(&mut self, path_identifier: Vec<String>) -> Result<Action, Action> {
+    fn create_nodes(&mut self, node_id: NodeId, cloud_provider: &CloudProviderKind) -> Result<(), Action> {
+            match cloud_provider {
+                CloudProviderKind::Azure => {
+                    self.config.cloud_provider_config.azure.iter().for_each(|config| {
+                        let res = config.name.to_string();
+
+                        match self.tree.get_mut(node_id) {
+                            None => (),
+                            Some(mut tree) => {tree.append(res);}
+                        }
+                    });
+                    Ok(())
+                
+                },
+                CloudProviderKind::Gcs => {
+                    self.config.cloud_provider_config.gcs.iter().for_each(|config| {
+                        let res = config.name.to_string();
+
+                        match self.tree.get_mut(node_id) {
+                            None => (),
+                            Some(mut tree) => {tree.append(res);}
+                        }
+                    });
+                    Ok(())
+                }
+                CloudProviderKind::S3 => Err(Action::Error("S3 not implemented".to_string())),
+            }
+        
+    }
+
+    pub fn list_configuration(&mut self, _path_identifier: Vec<String>) -> Result<Action, Action> {
         // set active cloud
-        self.config.cloud_provider_config.activate_config(path_identifier)?;
+        // self.config.cloud_provider_config.activate_config(path_identifier)?;
 
         // list items
         let output = util::cli_command("gsutil", &vec!["ls"])?;
@@ -133,7 +185,7 @@ impl Component for Connections {
 
         self.config
             .cloud_provider_config
-            .cloud_providers
+            .all_cloud_providers()
             .iter()
             .for_each(|cloud| {
                 tree.root_mut().append(cloud.to_string());
@@ -243,9 +295,9 @@ impl Component for Connections {
                 } else if key == self.config.key_config.toggle_selected {
                     self.state.toggle_selected();
                     Ok(Action::Nothing)
-                } else if key == self.config.key_config.activate_connection {
+                } else if key == self.config.key_config.activate {
                     let selected = self.state.selected().to_vec();
-                    self.activate_connection(selected)
+                    self.activate(selected)
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
                     if selected.len() == 2 {
