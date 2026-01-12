@@ -72,12 +72,12 @@ impl App {
                 Ok(act) => match act {
                     Action::Quit => break,
                     Action::ChangeFocus(focus) => self.change_focus(focus),
-                    Action::ListCloudProvider(cloud_provider_config) => {
-                        self.config.cloud_provider_config = cloud_provider_config;
-                        for component in self.components.iter_mut() {
-                            component.register_config(self.config.clone(), self.focus)?;
-                        }
-                    }
+                    // Action::ListCloudProvider(cloud_provider_config) => {
+                    //     self.config.cloud_provider_config = cloud_provider_config;
+                    //     for component in self.components.iter_mut() {
+                    //         component.register_config(self.config.clone(), self.focus)?;
+                    //     }
+                    // }
                     Action::ListConfiguration(cloud_provider_config, buckets) => {
                         self.config.cloud_provider_config = cloud_provider_config.clone();
                         self.change_focus(Focus::Viewer);

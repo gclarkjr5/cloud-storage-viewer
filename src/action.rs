@@ -4,7 +4,7 @@ use crate::{app::Focus, config::cloud_provider_config::CloudProviderConfig};
 pub enum Action {
     Quit,
     ListConfiguration(CloudProviderConfig, Vec<u8>),
-    ListCloudProvider(CloudProviderConfig),
+    // ListCloudProvider(CloudProviderConfig),
     Filter(Vec<String>),
     ChangeFocus(Focus),
     Nothing,

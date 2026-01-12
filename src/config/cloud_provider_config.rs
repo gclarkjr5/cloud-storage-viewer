@@ -76,14 +76,17 @@ impl CloudProviderConfig {
                 self.azure.clear();
 
                 // For Azure, you must run this command to see the active connection
-                let active_conn = match util::cli_command("az", &vec!["account", "show", "--query", "name", "--output", "yaml"]) {
-                    Ok(data) => {
-                        let name = data.lines().map(|line| line.expect("error getting azure listing")).collect::<Vec<String>>();
-                        let needed_name = name[0].clone();
-                        Ok(needed_name)
-                    },
-                    Err(e) => Err(e)
-                }.expect("Error getting name out of Azure Active Conn");
+                let mut active_conn = String::new();
+
+                if let Ok(data) = util::cli_command("az", &vec!["account", "show", "--query", "name", "--output", "yaml"]) {
+                    match data.lines().next() {
+                        None => (),
+                        Some(ln) => match ln {
+                            Err(_) => (),
+                            Ok(l) => active_conn = l
+                        }
+                    }
+                }
 
                 // Now list out all available connections
                 let cmd_args = vec!["account", "list", "--query", "[].name", "--output", "yaml"];
@@ -97,18 +100,19 @@ impl CloudProviderConfig {
                     Ok(output) => {
                         info!("Successful listing.");
                         output.stdout.lines().for_each(|line| {
-                            let splits = line
-                                .expect("error getting line in config list")
-                                .split_whitespace()
-                                .map(|split| split.to_string())
-                                .collect::<Vec<String>>();
-
-                            let conf = AzureConfig {
-                                name: splits[1].clone(),
-                                is_active: splits[1] == active_conn,
-                            };
-
-                            self.azure.push(conf);
+                            match line {
+                                Err(_) => (),
+                                Ok(ln) => {
+                                    match ln.split_whitespace().last() {
+                                        None => (),
+                                        Some(l) => {
+                                            self.azure.push(
+                                                AzureConfig { name: l.to_string(), is_active: l == active_conn }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         });
                         Ok(())
                     }
@@ -132,20 +136,28 @@ impl CloudProviderConfig {
                     Ok(output) => {
                         info!("Successful listing.");
                         output.stdout.lines().skip(1).for_each(|line| {
-                            let splits = line
-                                .expect("error getting line in config list")
-                                .split_whitespace()
-                                .map(|split| split.to_string())
-                                .collect::<Vec<String>>();
+                            match line {
+                                Err(_) => (),
+                                Ok(ln) => {
+                                    let mut lsplit = ln.split_whitespace();
+                                    let name = match lsplit.next() {
+                                        None => String::new(),
+                                        Some(l) => l.to_string()
+                                    };
+                                    let is_active = match lsplit.next() {
+                                        None => false,
+                                        Some(l) => {
+                                            let lowered = l.to_lowercase();
+                                            lowered.parse::<bool>().unwrap_or_default()
 
-                            let conf = GcsConfig {
-                                name: splits[0].clone(),
-                                is_active: splits[1].to_lowercase().clone().parse().unwrap(),
-                                // account: account.clone(),
-                                // project: project.clone(),
-                            };
+                                        }
+                                    };
 
-                            self.gcs.push(conf);
+                                    self.gcs.push(
+                                        GcsConfig { name, is_active }
+                                    );
+                                }
+                            }
                         });
                         Ok(())
                     }
