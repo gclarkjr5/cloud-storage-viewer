@@ -10,34 +10,41 @@ use crate::action::Action;
 use crate::util;
 
 #[derive(Debug, Clone)]
-pub struct CloudConfig {
+pub struct CloudProviderConfig {
     pub cloud_providers: Vec<CloudProvider>,
-    pub active_cloud_provider: Option<CloudProvider>,
+    pub active_cloud_connection: Option<CloudConnection>,
 }
 
-impl Display for CloudConfig {
+impl Display for CloudProviderConfig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.active_cloud_provider.is_some() {
-            let cloud: String = self.active_cloud_provider.clone().unwrap().into();
-            info!("This is running somehow.");
-            let ac_res = self
-                .active_cloud_provider
-                .clone()
-                .unwrap()
-                .get_active_config();
+        if let Some(conn) = self.active_cloud_connection.clone() {
+            let cloud: String = conn.clone().into();
+            let name = conn.name();
+            write!(f, "{name}({cloud})")
+        // }
+        // if self.active_cloud_connection.is_some() {
 
-            if let Ok(ac) = ac_res {
-                write!(f, "{ac}({cloud})")
-            } else {
-                Err(Error)
-            }
+        //     let name = self.active_cloud_connection.unwrap().name();
+        //     // let cloud: String = self.active_cloud_connection.unwrap().into();
+        //     // let ac_res = self
+        //     //     .active_cloud_connection
+        //     //     .clone()
+        //     //     .unwrap()
+        //     //     .get_active_config();
+
+        //     write!(f, "{name}")
+        //     // if let Ok(ac) = ac_res {
+        //     //     write!(f, "{ac}({cloud})")
+        //     // } else {
+        //     //     Err(Error)
+        //     // }
         } else {
             write!(f, "No Active Cloud Provider")
         }
     }
 }
 
-impl Default for CloudConfig {
+impl Default for CloudProviderConfig {
     fn default() -> Self {
         Self {
             cloud_providers: vec![
@@ -45,12 +52,12 @@ impl Default for CloudConfig {
                 CloudProvider::Azure(Vec::new()),
                 CloudProvider::S3(Vec::new()),
             ],
-            active_cloud_provider: None,
+            active_cloud_connection: None,
         }
     }
 }
 
-impl CloudConfig {
+impl CloudProviderConfig {
     pub fn get_cloud_provider(&mut self, cloud_provider: String) -> Result<&mut CloudProvider, Action> {
         info!("Extracting Cloud Provider, {cloud_provider:?}, from Config");
         let found_cp = self.cloud_providers.iter_mut()
@@ -89,22 +96,22 @@ impl CloudConfig {
         }
     }
 
-    pub fn set_active_cloud(&mut self, cloud_provider: CloudProvider) {
-        self.cloud_providers
-            .iter()
-            .for_each(|cp| match (cp, cloud_provider.clone()) {
-                (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
-                    self.active_cloud_provider = Some(cp.clone())
-                }
-                (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => {
-                    self.active_cloud_provider = Some(cp.clone())
-                }
-                (CloudProvider::S3(_), CloudProvider::S3(_)) => {
-                    self.active_cloud_provider = Some(cp.clone())
-                }
-                _ => (),
-            });
-    }
+    // pub fn set_active_cloud(&mut self, cloud_provider: CloudProvider) {
+    //     self.cloud_providers
+    //         .iter()
+    //         .for_each(|cp| match (cp, cloud_provider.clone()) {
+    //             (CloudProvider::Azure(_), CloudProvider::Azure(_)) => {
+    //                 self.active_cloud_connection = Some(cp.clone())
+    //             }
+    //             (CloudProvider::Gcs(_), CloudProvider::Gcs(_)) => {
+    //                 self.active_cloud_connection = Some(cp.clone())
+    //             }
+    //             (CloudProvider::S3(_), CloudProvider::S3(_)) => {
+    //                 self.active_cloud_connection = Some(cp.clone())
+    //             }
+    //             _ => (),
+    //         });
+    // }
 
     pub fn activate_config(&mut self, path_identifier: Vec<String>) -> Result<Action, Action> {
         // get the cloud in the path identifer as well as possible new connection
@@ -114,27 +121,33 @@ impl CloudConfig {
         let new_conn = path_identifier[2]
             .clone()
             .split('/')
-            .last()
+            .next_back()
             .unwrap()
             .to_string();
 
         let current_conn = cloud_provider.get_active_config()?;
-        if current_conn != new_conn {
-            info!("Changing Connection from {current_conn:?} to {new_conn:?}");
+        let current_conn_name = current_conn.name();
+        if current_conn_name != new_conn {
+            info!("Changing Connection from {current_conn_name:?} to {new_conn:?}");
             cloud_provider.activate_new_config(new_conn.clone())?;
+
+            let new_cloud_conn = cloud_provider.get_active_config()?;
+            self.active_cloud_connection = Some(new_cloud_conn);
+            // self.set_active(cloud_provider_of_selection)?;
+            info!("Connection Updated: {self:?}");
+
+            Ok(Action::ActivateConfig(self.clone()))
+        } else {
+            Ok(Action::Nothing)
         }
-        self.update(cloud_provider_of_selection)?;
-        info!("Connection Changed: {self:?}");
-
-        Ok(Action::ActivateConfig(self.clone()))
     }
 
-    fn update(&mut self, cloud_provider: String) -> Result<Action, Action> {
-        // cloud_provider.update()?;
-        let cp = self.get_cloud_provider(cloud_provider.to_string()).expect("Error getting cp");
-        self.active_cloud_provider = Some(cp.clone());
-        Ok(Action::Nothing)
-    }
+    // fn set_active(&mut self, cloud_provider: String) -> Result<Action, Action> {
+    //     info!("Setting Active Cloud Connection to {cloud_provider:?}");
+    //     let cp = self.get_cloud_provider(cloud_provider.to_string()).expect("Error getting cp");
+    //     self.active_cloud_connection = Some(cp.clone());
+    //     Ok(Action::Nothing)
+    // }
 
     pub fn list_config(&mut self, cloud_provider: CloudProvider) {
         self.cloud_providers
@@ -145,7 +158,7 @@ impl CloudConfig {
                 (CloudProvider::S3(_), CloudProvider::S3(_)) => (),
                 _ => (),
             });
-        self.set_active_cloud(cloud_provider)
+        // self.set_active_cloud(cloud_provider)
     }
 }
 
@@ -299,43 +312,34 @@ impl CloudProvider {
             Self::S3(_) => Err(Action::Error("S3 update not implemented".to_string())),
         }
     }
-    fn get_active_config(&self) -> Result<String, Action> {
+    fn get_active_config(&self) -> Result<CloudConnection, Action> {
         let name = self.to_string();
         info!("Retrieving active config from: {name:?}");
 
         match self {
             Self::Azure(confs) => {
-                // run az account show and pull the name to get current default/active one
-                // match util::cli_command("az", &vec!["account", "show", "--query", "name", "--output", "yaml"]) {
-                //     Ok(data) => {
-                //         let name = data.lines().map(|line| line.expect("error getting azure listing")).collect::<Vec<String>>();
-                //         let needed_name = name[0].clone();
-                //         info!("Active config: {needed_name:?}");
-                //         Ok(needed_name.clone())
-                //     },
-                //     Err(e) => Err(e)
-                // }
                 let conf = confs.iter().find(|c| c.is_active);
 
-                if let Some(az) = conf {
-                    let needed_name = az.name.clone();
-                    info!("Active config retrieved: {needed_name}");
-                    Ok(needed_name)
+                if let Some(conn) = conf {
+                    // let needed_name = az.name.clone();
+                    info!("Active config retrieved: {conn:?}");
+                    Ok(CloudConnection::Azure(conn.clone()))
                 } else {
                     info!("NO ACTIVE AZURE CONF FOUND");
-                    Ok(String::new())
+                    Err(Action::Error("No active AZ config".to_string()))
+                    // Ok(String::new())
                 }
             }
             Self::Gcs(confs) => {
                 let gcsconf = confs.iter().find(|c| c.is_active);
 
-                if let Some(gc) = gcsconf {
-                    let needed_name = gc.name.clone();
-                    info!("Active config retrieved: {needed_name}");
-                    Ok(needed_name)
+                if let Some(conn) = gcsconf {
+                    // let needed_name = gc.name.clone();
+                    info!("Active config retrieved: {conn:?}");
+                    Ok(CloudConnection::Gcs(conn.clone()))
                 } else {
                     info!("NO ACTIVE GCS CONF FOUND");
-                    Ok(String::new())
+                    Err(Action::Error("No active GCS config".to_string()))
                 }
             }
             Self::S3(_confs) => Err(Action::Error(
@@ -345,7 +349,7 @@ impl CloudProvider {
     }
     fn activate_new_config(&mut self, new_config: String) -> Result<(), Action> {
         match self {
-            Self::Azure(_) => {
+            Self::Azure(confs) => {
                 let args = &vec!["account", "set", "--name", &new_config]; 
                 info!("Activation command: az {args:?}");
                 match util::cli_command(
@@ -354,7 +358,10 @@ impl CloudProvider {
                 ) {
                     Ok(_) => {
                         info!("Activation successful");
-
+                        confs.iter_mut().for_each(|conn| {
+                            conn.is_active = conn.name == new_config
+                        });
+                        info!("State edits successful.");
                         Ok(())
                     },
                     Err(e) => Err(e),
@@ -371,11 +378,7 @@ impl CloudProvider {
                     Ok(_) => {
                         info!("Activation successful.");
                         confs.iter_mut().for_each(|conn| {
-                            if conn.name == new_config {
-                                conn.is_active = true;
-                            } else {
-                                conn.is_active = false;
-                            }
+                            conn.is_active = conn.name == new_config
                         });
                         info!("State edits successful.");
                         Ok(())
@@ -436,3 +439,31 @@ pub struct GcsConfig {
     pub name: String,
     pub is_active: bool,
 }
+
+#[derive(Debug, Clone)]
+pub enum CloudConnection {
+    S3(S3Config),
+    Azure(AzureConfig),
+    Gcs(GcsConfig),
+}
+
+impl From<CloudConnection> for String {
+    fn from(cloud_connection: CloudConnection) -> Self {
+        match cloud_connection {
+            CloudConnection::Azure(_) => "Azure Blob Storage".to_string(),
+            CloudConnection::Gcs(_) => "Google Cloud Storage".to_string(),
+            CloudConnection::S3(_) => "AWS S3".to_string(),
+        }
+    }
+}
+
+impl CloudConnection {
+    pub fn name(&self) -> String {
+        match self {
+            CloudConnection::S3(conf) => conf.name.clone(),
+            CloudConnection::Azure(conf) => conf.name.clone(),
+            CloudConnection::Gcs(conf) => conf.name.clone(),
+        }
+    }
+}
+

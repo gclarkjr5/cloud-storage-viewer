@@ -72,16 +72,16 @@ impl App {
                 Ok(act) => match act {
                     Action::Quit => break,
                     Action::ChangeFocus(focus) => self.change_focus(focus),
-                    Action::ListCloudProvider(cloud_config) => {
-                        self.config.cloud_config = cloud_config;
+                    Action::ListCloudProvider(cloud_provider_config) => {
+                        self.config.cloud_provider_config = cloud_provider_config;
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
                         }
                     }
-                    Action::ListConfiguration(cloud_config, buckets) => {
-                        self.config.cloud_config = cloud_config.clone();
+                    Action::ListConfiguration(cloud_provider_config, buckets) => {
+                        self.config.cloud_provider_config = cloud_provider_config.clone();
                         self.change_focus(Focus::Viewer);
-                        let selection = format!("{}", cloud_config);
+                        let selection = format!("{}", cloud_provider_config);
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
                             if let Some(tree_component) = component.as_any_mut().downcast_mut::<Viewer>() {
@@ -111,9 +111,9 @@ impl App {
                             }
                         }
                     }
-                    Action::ActivateConfig(cloud_config) => {
-                        self.config.cloud_config = cloud_config;
-                        // self.config.cloud_config.activate_config(cloud_config)?;
+                    Action::ActivateConfig(cloud_provider_config) => {
+                        self.config.cloud_provider_config = cloud_provider_config;
+                        // self.config.cloud_provider_config.activate_config(cloud_provider_config)?;
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
                         }

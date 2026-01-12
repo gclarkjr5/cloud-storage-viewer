@@ -46,7 +46,7 @@ impl Component for Footer {
         ])
         .areas(footer);
 
-        let active_config = format!("{}", self.config.cloud_config);
+        let active_config = format!("{}", self.config.cloud_provider_config);
 
         let active_connection_widget = Paragraph::new(Line::from(vec![active_config.green()]))
             .block(

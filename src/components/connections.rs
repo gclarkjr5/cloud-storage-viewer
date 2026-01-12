@@ -17,7 +17,6 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 use crate::action::Action;
 use crate::app::Focus;
 use crate::config::Config;
-use crate::config::cloud_config::CloudProvider;
 use crate::key::Key;
 use crate::util;
 
@@ -57,7 +56,7 @@ impl Connections {
             error!(msg);
             Err(Action::Error(msg.to_string()))
         } else {
-            self.config.cloud_config.activate_config(selection)
+            self.config.cloud_provider_config.activate_config(selection)
         }
     }
 
@@ -76,7 +75,7 @@ impl Connections {
         // of more cloud implementations has gotten
         self
             .config
-            .cloud_config
+            .cloud_provider_config
             .verify_implemented_cloud_provider(cloud_provider_selection.clone())?;
 
         // find the node to append to
@@ -92,7 +91,7 @@ impl Connections {
             Some(nid) => {
                 info!("Tree Node Identified");
 
-                let cloud_provider = self.config.cloud_config.get_cloud_provider(cloud_provider_selection).expect("Error returning cloud provider from conns");
+                let cloud_provider = self.config.cloud_provider_config.get_cloud_provider(cloud_provider_selection).expect("Error returning cloud provider from conns");
                 cloud_provider.list_accounts()?;
                 info!("Creating Stateful Tree for {request_path:?}");
                 cloud_provider.create_nodes(&mut self.tree, nid)?;
@@ -109,13 +108,13 @@ impl Connections {
 
     pub fn list_configuration(&mut self, path_identifier: Vec<String>) -> Result<Action, Action> {
         // set active cloud
-        self.config.cloud_config.activate_config(path_identifier)?;
+        self.config.cloud_provider_config.activate_config(path_identifier)?;
 
         // list items
         let output = util::cli_command("gsutil", &vec!["ls"])?;
 
         Ok(Action::ListConfiguration(
-            self.config.cloud_config.clone(),
+            self.config.cloud_provider_config.clone(),
             output,
         ))
     }
@@ -130,10 +129,10 @@ impl Component for Connections {
     }
 
     fn init(&mut self) -> Result<(), String> {
-        let mut tree = ETree::new("Connections".to_string());
+        let mut tree = ETree::new("Cloud Providers".to_string());
 
         self.config
-            .cloud_config
+            .cloud_provider_config
             .cloud_providers
             .iter()
             .for_each(|cloud| {

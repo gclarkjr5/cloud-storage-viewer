@@ -1,15 +1,15 @@
-use crate::{app::Focus, config::cloud_config::CloudConfig};
+use crate::{app::Focus, config::cloud_provider_config::CloudProviderConfig};
 
 #[derive(Debug, Clone)]
 pub enum Action {
     Quit,
-    ListConfiguration(CloudConfig, Vec<u8>),
-    ListCloudProvider(CloudConfig),
+    ListConfiguration(CloudProviderConfig, Vec<u8>),
+    ListCloudProvider(CloudProviderConfig),
     Filter(Vec<String>),
     ChangeFocus(Focus),
     Nothing,
     Skip,
-    ActivateConfig(CloudConfig),
+    ActivateConfig(CloudProviderConfig),
     SelectFilteredItem(String, Focus),
     Error(String),
 }

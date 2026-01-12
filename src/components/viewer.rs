@@ -87,7 +87,7 @@ impl Component for Viewer {
     fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
         self.config = config;
 
-        let active_config = format!("{}", self.config.cloud_config);
+        let active_config = format!("{}", self.config.cloud_provider_config);
 
         let tree = ETree::new(active_config);
         let mut items = vec![];

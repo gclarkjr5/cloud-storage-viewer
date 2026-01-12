@@ -1,15 +1,15 @@
-use cloud_config::CloudConfig;
+use cloud_provider_config::CloudProviderConfig;
 use key_config::KeyConfig;
 
-use crate::{action::Action, config::cloud_config::CloudProvider};
+use crate::{action::Action, config::cloud_provider_config::CloudProvider};
 
-pub mod cloud_config;
+pub mod cloud_provider_config;
 pub mod key_config;
 
 #[derive(Debug, Clone, Default)]
 pub struct Config {
     pub key_config: KeyConfig,
-    pub cloud_config: CloudConfig,
+    pub cloud_provider_config: CloudProviderConfig,
 }
 
 fn is_directory(loc: &str) -> bool {
