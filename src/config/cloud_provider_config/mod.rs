@@ -246,16 +246,28 @@ impl CloudProviderConfig {
     // }
 
     pub fn ls(&mut self, selection: Vec<String>) -> Result<Action, Action> {
-        let connection_selection: ConnectionComponentSelection = selection.clone().into();
-        // this scenario is only for listing connections of a cloud provider
-        if connection_selection.cloud_provider_connection.is_none() {
-            self.list_connections(&connection_selection.cloud_provider_kind)?;
-            self.activate(selection)?;
-            Ok(Action::Nothing)
-            // return Ok(Action::ActivateConfig(self.clone()))
-        } else {
-            Ok(Action::Error("Cannot do connections yet".to_string()))
+        if selection.len() < 2 {
+            return Err(Action::Error("Cannot List Connections".to_string()))
         }
+
+        let connection_selection: ConnectionComponentSelection = selection.clone().into();
+        match connection_selection.cloud_provider_connection {
+            None => {
+                // No account means we just re-list the Cloud Provider
+                self.list_connections(&connection_selection.cloud_provider_kind)?;
+                self.activate(selection)?;
+                Ok(Action::Nothing)
+            }
+            Some(conn) => {
+                Ok(Action::Nothing)
+            }
+        }
+        // this scenario is only for listing connections of a cloud provider
+        // if connection_selection.cloud_provider_connection.is_none() {
+        //     // return Ok(Action::ActivateConfig(self.clone()))
+        // } else {
+        //     Ok(Action::Error("Cannot do connections yet".to_string()))
+        // }
         // activate the account requested
         // self.activate(&listing_request.provider_kind, listing_request.connection.clone())?;
 

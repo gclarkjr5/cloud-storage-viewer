@@ -91,16 +91,29 @@ impl App {
                     // }
                     Action::ConnectionList(connection_selection) => {
                         self.config.app_selection = connection_selection.clone();
-                        self.connection_ls(connection_selection.into()).expect("Conn listing error");
+                        match self.connection_ls(connection_selection) {
+                            Err(e) => if let Action::Error(e) = e {
+                                self.change_focus(Focus::Error);
+                                for component in self.components.iter_mut() {
+                                    component.report_error(&e)?;
+                                }
+                            }
+                            Ok(_) => {
+                                for component in self.components.iter_mut() {
+                                    component.register_config(&self.config, self.focus)?;
+                                }
+                                
+                            }
+                        }
                         // let gcp = self.config.cloud_provider_config.gcs.clone();
                         // info!("{gcp:?}");
                         // self.change_focus(Focus::Viewer);
                         // let selection = format!("{}", self.config.cloud_provider_config);
                         // // let active = self.config.cloud_provider_config.active_cloud_connection.clone();
                         // // info!("Attempting to select the following in Viewer {active:?}");
-                        for component in self.components.iter_mut() {
-                            component.register_config(&self.config, self.focus)?;
-                        }
+                        // for component in self.components.iter_mut() {
+                        //     component.register_config(&self.config, self.focus)?;
+                        // }
                         //     if let Some(tree_component) = component.as_any_mut().downcast_mut::<Viewer>() {
                         //         match tree_component.list_item(
                         //             buckets.clone(),
@@ -258,7 +271,6 @@ impl App {
     pub fn connection_ls(
         &mut self,
         connection_selection: Vec<String>,
-        // focus: Focus,
     ) -> Result<Action, Action> {
 
         self.config.cloud_provider_config.ls(connection_selection)
