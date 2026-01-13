@@ -25,8 +25,8 @@ impl Component for Footer {
         self
     }
 
-    fn register_config(&mut self, config: Config, _focus: Focus) -> Result<(), String> {
-        self.config = config;
+    fn register_config(&mut self, _config: &Config, _focus: Focus) -> Result<(), String> {
+        // self.config = config.clone();
         Ok(())
     }
 
@@ -36,6 +36,7 @@ impl Component for Footer {
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
+        config: &Config,
     ) -> Result<(), String> {
         let [_, footer] = Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
 
@@ -46,7 +47,10 @@ impl Component for Footer {
         ])
         .areas(footer);
 
-        let active_config = format!("{}", self.config.cloud_provider_config);
+        let active_config = match &config.cloud_provider_config.active_cloud_connection {
+            None => "No Active Cloud Connection".to_string(),
+            Some(s) => s.to_string()
+        };
 
         let active_connection_widget = Paragraph::new(Line::from(vec![active_config.green()]))
             .block(

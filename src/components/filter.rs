@@ -102,7 +102,7 @@ pub trait Filter: std::fmt::Debug {
     fn filter_results_handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action>;
     fn draw(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect, focus: Focus) -> Result<(), String>;
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action>;
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
+    fn register_config(&mut self, config: &Config, focus: Focus) -> Result<(), String>;
 } 
 
 #[derive(Debug)]
@@ -237,10 +237,10 @@ impl Filter for ConnectionFilter {
         }
     }
 
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
-        self.config = config;
+    fn register_config(&mut self, config: &Config, focus: Focus) -> Result<(), String> {
+        // self.config = config;
         self.filtered_results
-            .register_config(self.config.clone(), focus)
+            .register_config(config.clone(), focus)
     }
 }
 
@@ -363,9 +363,9 @@ impl Filter for ViewerFilter {
         }
     }
 
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
-        self.config = config;
+    fn register_config(&mut self, config: &Config, focus: Focus) -> Result<(), String> {
+        // self.config = config;
         self.filtered_results
-            .register_config(self.config.clone(), focus)
+            .register_config(config.clone(), focus)
     }
 }

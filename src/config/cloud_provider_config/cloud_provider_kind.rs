@@ -3,7 +3,7 @@ use std::{fmt, process::Command};
 use crate::action::Action;
 
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub enum CloudProviderKind {
     S3,
     Azure,

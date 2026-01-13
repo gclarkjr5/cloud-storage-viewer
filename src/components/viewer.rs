@@ -84,10 +84,11 @@ impl Component for Viewer {
         self
     }
 
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String> {
-        self.config = config;
-
-        let active_config = format!("{}", self.config.cloud_provider_config);
+    fn register_config(&mut self, config: &Config, focus: Focus) -> Result<(), String> {
+        let active_config = match &config.cloud_provider_config.active_cloud_connection {
+            None => "No Active Cloud Connection".to_string(),
+            Some(s) => s.to_string()
+        };
 
         let tree = ETree::new(active_config);
         let mut items = vec![];
@@ -108,7 +109,7 @@ impl Component for Viewer {
         self.tree = tree;
         self.items = items;
         self.results_pager = results_pager;
-        self.filter.register_config(self.config.clone(), focus)
+        self.filter.register_config(config, focus)
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
@@ -249,6 +250,7 @@ impl Component for Viewer {
         frame: &mut Frame,
         area: Rect,
         focus: crate::app::Focus,
+        _config: &Config,
     ) -> Result<(), String> {
         let focused = matches!(focus, Focus::Viewer);
         let [content, _] =

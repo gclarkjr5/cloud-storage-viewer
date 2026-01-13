@@ -19,11 +19,11 @@ pub mod viewer;
 // pub mod viewer_filter_results;
 
 pub trait Component: std::fmt::Debug {
-    fn init(&mut self) -> Result<(), String> {
+    fn init(&mut self, _config: &Config) -> Result<(), String> {
         Ok(())
     }
     fn name(&self) -> &str;
-    fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus) -> Result<(), String>;
+    fn draw(&mut self, frame: &mut Frame, area: Rect, focus: Focus, config: &Config) -> Result<(), String>;
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
         let _key_event = key_event;
         let _foucs = focus;
@@ -38,8 +38,8 @@ pub trait Component: std::fmt::Debug {
         let _foucs = focus;
         Ok(Action::Nothing)
     }
-    fn register_config(&mut self, config: Config, focus: Focus) -> Result<(), String>;
-    fn report_error(&mut self, message: String) -> Result<(), String> {
+    fn register_config(&mut self, config: &Config, focus: Focus) -> Result<(), String>;
+    fn report_error(&mut self, message: &String) -> Result<(), String> {
         let _message = message;
         Ok(())
     }

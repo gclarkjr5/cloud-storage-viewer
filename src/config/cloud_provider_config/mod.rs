@@ -9,12 +9,13 @@ pub mod cloud_provider_connection;
 use tracing::{error, info};
 
 use crate::action::Action;
-use crate::components::connections::ListingRequest;
+use crate::components::connections::ConnectionComponentSelection;
+// use crate::components::connections::ListingRequest;
 use cloud_provider_connection::{AzureConfig, CloudConnection, GcsConfig, S3Config};
 use cloud_provider_kind::CloudProviderKind;
 use crate::util;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CloudProviderConfig {
     pub s3: Vec<S3Config>,
     pub azure: Vec<AzureConfig>,
@@ -34,16 +35,6 @@ impl Display for CloudProviderConfig {
     }
 }
 
-impl Default for CloudProviderConfig {
-    fn default() -> Self {
-        Self {
-            s3: vec![S3Config::default()],
-            azure: vec![AzureConfig::default()],
-            gcs: vec![GcsConfig::default()],
-            active_cloud_connection: None,
-        }
-    }
-}
 
 impl CloudProviderConfig {
     pub fn all_cloud_providers(&self) -> &[CloudProviderKind] {
@@ -93,9 +84,11 @@ impl CloudProviderConfig {
                                     match ln.split_whitespace().last() {
                                         None => (),
                                         Some(l) => {
-                                            self.azure.push(
-                                                AzureConfig { name: l.to_string(), is_active: l == active_conn }
-                                            )
+                                            let conf = AzureConfig { name: l.to_string(), is_active: l == active_conn };
+                                            if conf.is_active {
+                                                self.active_cloud_connection = Some(CloudConnection::Azure(conf.clone()));
+                                            }
+                                            self.azure.push(conf)
                                         }
                                     }
                                 }
@@ -140,10 +133,11 @@ impl CloudProviderConfig {
 
                                         }
                                     };
-
-                                    self.gcs.push(
-                                        GcsConfig { name, is_active }
-                                    );
+                                    let conf = GcsConfig { name: name.to_string(), is_active };
+                                    if conf.is_active {
+                                        self.active_cloud_connection = Some(CloudConnection::Gcs(conf.clone()));
+                                    }
+                                    self.gcs.push(conf);
                                 }
                             }
                         });
@@ -158,20 +152,32 @@ impl CloudProviderConfig {
         }
     }
 
-    pub fn activate(&mut self, cloud_provider_kind: &CloudProviderKind, account: Option<String>) -> Result<(), Action> {
-        match account {
+    // pub fn activate(&mut self, cloud_provider_kind: &CloudProviderKind, account: Option<String>) -> Result<(), Action> {
+    pub fn activate(&mut self, selection: Vec<String>) -> Result<(), Action> {
+        if selection.len() < 2 {
+            return Err(Action::Error("Cannot Activate Connections".to_string()))
+        }
+
+        let sel: ConnectionComponentSelection = selection.into();
+        match sel.cloud_provider_connection {
             None => {
                 // No account means we just find the currently active account within
                 // the cloud provider and make that the active connection
-                match cloud_provider_kind {
-                    CloudProviderKind::S3 => Err(Action::Error("".to_string())),
+                match sel.cloud_provider_kind {
+                    CloudProviderKind::S3 => Err(Action::Error("Not Implemented".to_string())),
                     CloudProviderKind::Azure => {
+                        if self.azure.is_empty() {
+                            return Err(Action::Error("Cannot Activate a Cloud Provider before listing one. Please list it by pressing [Enter].".to_string()))
+                        }
                         let conf = self.azure.iter().find(|conf| conf.is_active);
                         self.active_cloud_connection = conf.map(|c| CloudConnection::Azure(c.clone()));
                         info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
                         Ok(())
                     },
                     CloudProviderKind::Gcs => {
+                        if self.gcs.is_empty() {
+                            return Err(Action::Error("Cannot Activate a Cloud Provider before listing one. Please list it by pressing [Enter].".to_string()))
+                        }
                         let conf = self.gcs.iter().find(|conf| conf.is_active);
                         self.active_cloud_connection = conf.map(|c| CloudConnection::Gcs(c.clone()));
                         info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
@@ -182,25 +188,30 @@ impl CloudProviderConfig {
             }
             Some(acc) => {
                 // An account means that it was selected by the user to change to
-                match cloud_provider_kind {
+                match sel.cloud_provider_kind {
                     CloudProviderKind::S3 => Err(Action::Error("".to_string())),
                     CloudProviderKind::Azure => {
-                        let conf = self.azure.iter().find(|conf| conf.name == acc);
-                        self.active_cloud_connection = conf.map(|c| CloudConnection::Azure(c.clone()));
-
+                        // mutate all to change to requested account
                         self.azure.iter_mut().for_each(|conf| {
                             conf.is_active = conf.name == acc;
                         });
+
+                        let conf = self.azure.iter().find(|conf| conf.is_active);
+                        self.active_cloud_connection = conf.map(|c| CloudConnection::Azure(c.clone()));
+
                         info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
                         Ok(())
                     },
                     CloudProviderKind::Gcs => {
-                        let conf = self.gcs.iter().find(|conf| conf.name == acc);
-                        self.active_cloud_connection = conf.map(|c| CloudConnection::Gcs(c.clone()));
-
+                        // mutate all to change to requested account
                         self.gcs.iter_mut().for_each(|conf| {
                             conf.is_active = conf.name == acc;
                         });
+
+                        // return newly active and set as active
+                        let conf = self.gcs.iter().find(|conf| conf.is_active);
+                        self.active_cloud_connection = conf.map(|c| CloudConnection::Gcs(c.clone()));
+
                         info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
                         Ok(())
                     },
@@ -210,58 +221,67 @@ impl CloudProviderConfig {
         }
     }
 
-    pub fn verify_implemented_cloud_provider(
-        &self,
-        cloud_provider_kind: &CloudProviderKind,
-    ) -> Result<(), Action> {
-        info!("Verifying tooling for {cloud_provider_kind:?}");
-        match cloud_provider_kind {
-            CloudProviderKind::Azure => {
-                cloud_provider_kind.check_cli_tools()?;
-                info!("Tooling verified.");
-                Ok(())
-            }
-            CloudProviderKind::Gcs => {
-                cloud_provider_kind.check_cli_tools()?;
-                info!("Tooling verified.");
-                Ok(())
-            }
-            CloudProviderKind::S3 => {
-                let message = format!("{} is not implemented yet", cloud_provider_kind);
-                error!("{message:?}");
-                Err(Action::Error(message))
-            }
-        }
-    }
+    // pub fn verify_implemented_cloud_provider(
+    //     &self,
+    //     cloud_provider_kind: &CloudProviderKind,
+    // ) -> Result<(), Action> {
+    //     info!("Verifying tooling for {cloud_provider_kind:?}");
+    //     match cloud_provider_kind {
+    //         CloudProviderKind::Azure => {
+    //             cloud_provider_kind.check_cli_tools()?;
+    //             info!("Tooling verified.");
+    //             Ok(())
+    //         }
+    //         CloudProviderKind::Gcs => {
+    //             cloud_provider_kind.check_cli_tools()?;
+    //             info!("Tooling verified.");
+    //             Ok(())
+    //         }
+    //         CloudProviderKind::S3 => {
+    //             let message = format!("{} is not implemented yet", cloud_provider_kind);
+    //             error!("{message:?}");
+    //             Err(Action::Error(message))
+    //         }
+    //     }
+    // }
 
-    pub fn ls(&mut self, listing_request: &ListingRequest) -> Result<Action, Action> {
-        // this scenario is only for
-        if listing_request.connection.is_none() {
-            self.list_connections(&listing_request.provider_kind)?;
-            self.activate(&listing_request.provider_kind, listing_request.connection.clone())?;
-            return Ok(Action::ActivateConfig(self.clone()))
-            // return Err(Action::Error("Only Connections/Accounts can be listed".to_string()))
+    pub fn ls(&mut self, selection: Vec<String>) -> Result<Action, Action> {
+        let connection_selection: ConnectionComponentSelection = selection.clone().into();
+        // this scenario is only for listing connections of a cloud provider
+        if connection_selection.cloud_provider_connection.is_none() {
+            self.list_connections(&connection_selection.cloud_provider_kind)?;
+            self.activate(selection)?;
+            Ok(Action::Nothing)
+            // return Ok(Action::ActivateConfig(self.clone()))
+        } else {
+            Ok(Action::Error("Cannot do connections yet".to_string()))
         }
         // activate the account requested
-        self.activate(&listing_request.provider_kind, listing_request.connection.clone())?;
+        // self.activate(&listing_request.provider_kind, listing_request.connection.clone())?;
 
         // do the listing
-        match &self.active_cloud_connection {
-            None => Ok(Action::Nothing),
-            Some(cloud_connection) => {
-                match cloud_connection {
-                    CloudConnection::S3(_conf) => Err(Action::Error("Not implemented yet".to_string())),
-                    CloudConnection::Azure(_conf) =>{
-                        // conf.ls();
-                        Ok(Action::Nothing)
-                    }
-                    CloudConnection::Gcs(conf) => {
-                        conf.ls()
-                        // Ok(Action::Nothing)
+        // match &self.active_cloud_connection {
+        //     None => Ok(Action::Nothing),
+        //     Some(cloud_connection) => {
+        //         match cloud_connection {
+        //             CloudConnection::S3(_conf) => Err(Action::Error("Not implemented yet".to_string())),
+        //             CloudConnection::Azure(_conf) =>{
+        //                 // conf.ls();
+        //                 Ok(Action::Nothing)
+        //             }
+        //             CloudConnection::Gcs(conf) => {
+        //                 let output = conf.ls();
+        //                 Ok(
+        //                     Action::ConnectionList(
+        //                         // self.active_cloud_connection.clone(),
+        //                         // output?
+        //                     )
+        //                 )
+        //                 // Ok(Action::Nothing)
                         
-                    }
-                }
-            }
-        }
+        //             }
+        //         }
+        //     }
+        // }
     }
 }

@@ -2,6 +2,7 @@ use ratatui::{
     layout::{Constraint, Layout},
     style::{Style, Stylize},
 };
+use tracing::info;
 use std::result::Result;
 use tui_popup::Popup;
 
@@ -28,6 +29,7 @@ impl Component for ErrorComponent {
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         focus: crate::app::Focus,
+        _config: &Config,
     ) -> Result<(), String> {
         let focused = matches!(focus, Focus::Error);
         let [content, _] =
@@ -41,17 +43,18 @@ impl Component for ErrorComponent {
         Ok(())
     }
 
-    fn report_error(&mut self, message: String) -> Result<(), String> {
-        self.message = [message, "Press any key to continue".to_string()].join(" -- ");
+    fn report_error(&mut self, message: &String) -> Result<(), String> {
+        self.message = [message.clone(), "Press any key to continue".to_string()].join(" -- ");
+        info!("{message}");
         Ok(())
     }
 
     fn register_config(
         &mut self,
-        config: crate::config::Config,
+        _config: &Config,
         _focus: Focus,
     ) -> Result<(), String> {
-        self.config = config;
+        // self.config = config.clone();
         Ok(())
     }
 

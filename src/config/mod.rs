@@ -9,6 +9,7 @@ pub mod key_config;
 pub struct Config {
     pub key_config: KeyConfig,
     pub cloud_provider_config: CloudProviderConfig,
+    pub app_selection: Vec<String>,
 }
 
 // fn is_directory(loc: &str) -> bool {

@@ -1,6 +1,8 @@
+use std::fmt;
+
 use tracing::info;
 
-use crate::{action::Action, util};
+use crate::{action::Action, config::cloud_provider_config::cloud_provider_kind::CloudProviderKind, util};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct S3Config {
@@ -20,13 +22,14 @@ pub struct GcsConfig {
 }
 
 impl GcsConfig {
-    pub fn ls(&self) -> Result<Action, Action> {
+    pub fn ls(&self) -> Result<Vec<u8>, Action> {
         let output = util::cli_command("gsutil", &vec!["ls"])?;
         info!("Results: {output:?}");
-        Ok(Action::Nothing)
 
-        // Ok(Action::ListConfiguration(
-        //     // self.config.cloud_provider_config.clone(),
+        Ok(output)
+
+        // Ok(Action::ListConnection(
+        //     self.config.cloud_provider_config.,
         //     output,
         // ))
         
@@ -39,6 +42,18 @@ pub enum CloudConnection {
     S3(S3Config),
     Azure(AzureConfig),
     Gcs(GcsConfig),
+}
+
+impl fmt::Display for CloudConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CloudConnection::Azure(conf) => write!(f, "{}({})", conf.name, CloudProviderKind::Azure),
+            CloudConnection::Gcs(conf) => write!(f, "{}({})", conf.name, CloudProviderKind::Gcs),
+            CloudConnection::S3(conf) => write!(f, "{}({})", conf.name, CloudProviderKind::S3),
+        }
+    }
+    // fn fmt(cloud_connection: CloudConnection) -> Self {
+    // }
 }
 
 impl From<CloudConnection> for String {
