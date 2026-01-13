@@ -3,7 +3,6 @@ use std::{fmt, process::Command};
 use crate::action::Action;
 
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CloudProviderKind {
     S3,
@@ -16,7 +15,7 @@ impl fmt::Display for CloudProviderKind {
         match self {
             CloudProviderKind::Gcs => write!(f, "Google Cloud Storage"),
             CloudProviderKind::Azure => write!(f, "Azure Blob Storage"),
-            &CloudProviderKind::S3 => write!(f, "AWS S3"),
+            CloudProviderKind::S3 => write!(f, "AWS S3"),
         }
     }
 }
@@ -53,6 +52,17 @@ impl CloudProviderKind {
 
 impl From<String> for CloudProviderKind {
     fn from(cloud_provider_kind: String) -> Self {
+        match cloud_provider_kind.as_str() {
+            "Azure Blob Storage" => CloudProviderKind::Azure,
+            "Google Cloud Storage" => CloudProviderKind::Gcs,
+            "AWS S3" => CloudProviderKind::S3,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl From<&String> for CloudProviderKind {
+    fn from(cloud_provider_kind: &String) -> Self {
         match cloud_provider_kind.as_str() {
             "Azure Blob Storage" => CloudProviderKind::Azure,
             "Google Cloud Storage" => CloudProviderKind::Gcs,

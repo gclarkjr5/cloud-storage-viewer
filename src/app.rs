@@ -78,10 +78,10 @@ impl App {
                     //         component.register_config(self.config.clone(), self.focus)?;
                     //     }
                     // }
-                    Action::ListConfiguration(cloud_provider_config, buckets) => {
-                        self.config.cloud_provider_config = cloud_provider_config.clone();
+                    Action::ListConfiguration(buckets) => {
+                        // self.config.cloud_provider_config = cloud_provider_config.clone();
                         self.change_focus(Focus::Viewer);
-                        let selection = format!("{}", cloud_provider_config);
+                        let selection = format!("{}", self.config.cloud_provider_config);
                         for component in self.components.iter_mut() {
                             component.register_config(self.config.clone(), self.focus)?;
                             if let Some(tree_component) = component.as_any_mut().downcast_mut::<Viewer>() {

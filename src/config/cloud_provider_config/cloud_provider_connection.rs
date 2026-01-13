@@ -1,3 +1,7 @@
+use tracing::info;
+
+use crate::{action::Action, util};
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct S3Config {
     pub name: String,
@@ -14,6 +18,21 @@ pub struct GcsConfig {
     pub name: String,
     pub is_active: bool,
 }
+
+impl GcsConfig {
+    pub fn ls(&self) -> Result<Action, Action> {
+        let output = util::cli_command("gsutil", &vec!["ls"])?;
+        info!("Results: {output:?}");
+        Ok(Action::Nothing)
+
+        // Ok(Action::ListConfiguration(
+        //     // self.config.cloud_provider_config.clone(),
+        //     output,
+        // ))
+        
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub enum CloudConnection {

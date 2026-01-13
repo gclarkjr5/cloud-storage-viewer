@@ -9,6 +9,7 @@ pub mod cloud_provider_connection;
 use tracing::{error, info};
 
 use crate::action::Action;
+use crate::components::connections::ListingRequest;
 use cloud_provider_connection::{AzureConfig, CloudConnection, GcsConfig, S3Config};
 use cloud_provider_kind::CloudProviderKind;
 use crate::util;
@@ -100,6 +101,7 @@ impl CloudProviderConfig {
                                 }
                             }
                         });
+
                         Ok(())
                     }
                     Err(_) => Err(Action::Error(
@@ -166,11 +168,13 @@ impl CloudProviderConfig {
                     CloudProviderKind::Azure => {
                         let conf = self.azure.iter().find(|conf| conf.is_active);
                         self.active_cloud_connection = conf.map(|c| CloudConnection::Azure(c.clone()));
+                        info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
                         Ok(())
                     },
                     CloudProviderKind::Gcs => {
                         let conf = self.gcs.iter().find(|conf| conf.is_active);
                         self.active_cloud_connection = conf.map(|c| CloudConnection::Gcs(c.clone()));
+                        info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
                         Ok(())
                     },
                 }
@@ -187,6 +191,7 @@ impl CloudProviderConfig {
                         self.azure.iter_mut().for_each(|conf| {
                             conf.is_active = conf.name == acc;
                         });
+                        info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
                         Ok(())
                     },
                     CloudProviderKind::Gcs => {
@@ -196,6 +201,7 @@ impl CloudProviderConfig {
                         self.gcs.iter_mut().for_each(|conf| {
                             conf.is_active = conf.name == acc;
                         });
+                        info!("Active Cloud Connection: {:?}", self.active_cloud_connection);
                         Ok(())
                     },
                 }
@@ -228,13 +234,16 @@ impl CloudProviderConfig {
         }
     }
 
-    pub fn ls(&mut self, cloud_provider_kind: &CloudProviderKind, account: Option<String>) -> Result<Action, Action> {
-        // an account must exist in the selection
-        if account.is_none() {
-            return Err(Action::Error("Only Connections/Accounts can be listed".to_string()))
+    pub fn ls(&mut self, listing_request: &ListingRequest) -> Result<Action, Action> {
+        // this scenario is only for
+        if listing_request.connection.is_none() {
+            self.list_connections(&listing_request.provider_kind)?;
+            self.activate(&listing_request.provider_kind, listing_request.connection.clone())?;
+            return Ok(Action::ActivateConfig(self.clone()))
+            // return Err(Action::Error("Only Connections/Accounts can be listed".to_string()))
         }
         // activate the account requested
-        self.activate(cloud_provider_kind, account)?;
+        self.activate(&listing_request.provider_kind, listing_request.connection.clone())?;
 
         // do the listing
         match &self.active_cloud_connection {
@@ -246,9 +255,9 @@ impl CloudProviderConfig {
                         // conf.ls();
                         Ok(Action::Nothing)
                     }
-                    CloudConnection::Gcs(_conf) => {
-                        // conf.ls();
-                        Ok(Action::Nothing)
+                    CloudConnection::Gcs(conf) => {
+                        conf.ls()
+                        // Ok(Action::Nothing)
                         
                     }
                 }

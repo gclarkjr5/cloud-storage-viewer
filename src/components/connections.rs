@@ -11,7 +11,7 @@ use ratatui::widgets::{Clear, Scrollbar, ScrollbarOrientation};
 use ratatui::Frame;
 use tracing::{info};
 use std::result::Result;
-use std::vec;
+use std::{fmt, vec};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::action::Action;
@@ -44,13 +44,131 @@ impl Default for Connections {
     }
 }
 
+pub struct ListingRequest {
+    pub provider_kind: CloudProviderKind,
+    pub connection: Option<String>,
+}
+
+// impl ListingRequest {
+//     fn ls(&self) -> Result<(), Action> {
+//         info!("{self}");
+//         match self.connection {
+//             // No Connection means we are listing connections available for a Cloud Provider Kind
+//             None => {
+//                 // verify that the selected connection is for an implemented cloud
+//                 // technically should never happen, mainly to see how far development
+//                 // of more cloud implementations has gotten
+//                 self.provider_kind.check_cli_tools()?;
+//             },
+//             Some(_) => ()
+//         }
+//     }
+// }
+
+impl fmt::Display for ListingRequest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.connection {
+            None => write!(f, "User Request: Listing Connections for {}", self.provider_kind),
+            Some(connection) => write!(f, "User Request: Listing 1st Level objects for {}({})", connection, self.provider_kind),
+            
+        }
+    }
+}
+
+fn create_listing_request(request_path: &[String]) -> Result<ListingRequest, Action> {
+        let mut request_iter = request_path.iter();
+        let cloud_provider_kind: Result<CloudProviderKind, Action> = match request_iter.next() {
+            None => Err(Action::Error("Nothing in Connections to list".to_string())),
+            Some(cp) => {
+                let cpk: CloudProviderKind = cp.into();
+                cpk.check_cli_tools()?;
+                Ok(cpk)
+            }
+        };
+        let listing_request = ListingRequest {
+            provider_kind: cloud_provider_kind?,
+            connection: request_iter.next().cloned()
+        };
+        info!("{listing_request}");
+
+        Ok(listing_request)
+    
+}
 
 impl Connections {
-    pub fn activate(&mut self, selection: Vec<String>) -> Result<Action, Action> {
+
+    // pub fn ls(
+    pub fn connection_ls(
+        &mut self,
+        selection: &[String],
+        // focus: Focus,
+    ) -> Result<Action, Action> {
+        let request_path = &selection[1..];
+        let listing_request = create_listing_request(request_path)?;
+
+
+        
+        // find the node to append to
+        info!("Searching for Tree Node to append to {request_path:?}");
+        let found_node = self.find_node_to_append(selection)?;
+
+        // if empty dont do anything
+        match found_node {
+            None => {
+                info!("No Tree Node Identified");
+                Ok(Action::Nothing)
+            },
+            Some(nid) => {
+                info!("Tree Node Identified");
+
+                // let cloud_provider = self.config.cloud_provider_config.get_cloud_provider(cloud_provider).expect("Error returning cloud provider from conns");
+
+                let listing_output = self.config.cloud_provider_config.ls(&listing_request)?;
+                // if let None = listing_request.connection {
+                    
+                //     self.config.cloud_provider_config.list_connections(&listing_request.provider_kind)?;
+                // } else {
+                //     self.config.cloud_provider_config.ls
+                // }
+
+                info!("Creating Stateful Tree for {request_path:?}");
+
+                self.create_nodes(nid, &listing_request.provider_kind)?;
+                // self.config.cloud_provider_config.create_nodes(&mut self.tree, nid, &cloud_provider)
+                // cloud_provider.create_nodes(&mut self.tree, nid)?;
+
+
+                info!("Connection Tree Nodes created");
+
+                self.items =
+                    util::make_tree_items(self.tree.nodes(), &mut self.results_pager, Focus::Connections);
+                info!("Recursive Tree Nodes created");
+                self.state.open(selection.to_vec());
+                Ok(listing_output)
+                // Ok(Action::Nothing)
+            }
+        }
+    }
+
+    // pub fn list_connection(&mut self, _path_identifier: Vec<String>) -> Result<Action, Action> {
+    //     // set active cloud
+    //     // self.config.cloud_provider_config.activate_config(path_identifier)?;
+
+    //     // list items
+    //     let output = util::cli_command("gsutil", &vec!["ls"])?;
+
+    //     Ok(Action::ListConfiguration(
+    //         // self.config.cloud_provider_config.clone(),
+    //         output,
+    //     ))
+    // }
+
+    pub fn activate(&mut self, selection: &[String]) -> Result<Action, Action> {
         // Remove Connections
         // first is Cloud Provider, then account (GCS/account_1, Azure/account_0, etc.)
         let request_path = &selection[1..];
-        info!("User Request: Activate Connection {request_path:?}.");
+
+        info!("Activating {request_path:?}");
 
         if request_path.is_empty() {
             // User tried to activate "Connections", do Nothing
@@ -72,59 +190,6 @@ impl Connections {
         }
     }
 
-    // pub fn ls(
-    pub fn list_cloud_provider(
-        &mut self,
-        selection: Vec<String>,
-        focus: Focus,
-    ) -> Result<Action, Action> {
-        let request_path = &selection[1..];
-        info!("User Request: List Connections for {request_path:?}");
-
-        let cloud_provider_selection: String = selection[1].clone();
-        let cloud_provider: CloudProviderKind = cloud_provider_selection.into();
-
-        // verify that the selected connection is for an implemented cloud
-        // technically should never happen, mainly to see how far development
-        // of more cloud implementations has gotten
-        self
-            .config
-            .cloud_provider_config
-            .verify_implemented_cloud_provider(&cloud_provider)?;
-
-        // find the node to append to
-        info!("Searching for Tree Node to append to {request_path:?}");
-        let found_node = self.find_node_to_append(&selection)?;
-
-        // if empty dont do anything
-        match found_node {
-            None => {
-                info!("No Tree Node Identified");
-                Ok(Action::Nothing)
-            },
-            Some(nid) => {
-                info!("Tree Node Identified");
-
-                // let cloud_provider = self.config.cloud_provider_config.get_cloud_provider(cloud_provider).expect("Error returning cloud provider from conns");
-
-                self.config.cloud_provider_config.list_connections(&cloud_provider)?;
-                info!("Creating Stateful Tree for {request_path:?}");
-
-                self.create_nodes(nid, &cloud_provider)?;
-                // self.config.cloud_provider_config.create_nodes(&mut self.tree, nid, &cloud_provider)
-                // cloud_provider.create_nodes(&mut self.tree, nid)?;
-
-
-                info!("Connection Tree Nodes created");
-
-                self.items =
-                    util::make_tree_items(self.tree.nodes(), &mut self.results_pager, focus);
-                info!("Recursive Tree Nodes created");
-                self.state.open(selection.clone());
-                Ok(Action::Nothing)
-            }
-        }
-    }
 
     fn create_nodes(&mut self, node_id: NodeId, cloud_provider: &CloudProviderKind) -> Result<(), Action> {
             match cloud_provider {
@@ -156,18 +221,6 @@ impl Connections {
         
     }
 
-    pub fn list_configuration(&mut self, _path_identifier: Vec<String>) -> Result<Action, Action> {
-        // set active cloud
-        // self.config.cloud_provider_config.activate_config(path_identifier)?;
-
-        // list items
-        let output = util::cli_command("gsutil", &vec!["ls"])?;
-
-        Ok(Action::ListConfiguration(
-            self.config.cloud_provider_config.clone(),
-            output,
-        ))
-    }
 }
 
 impl Component for Connections {
@@ -294,19 +347,21 @@ impl Component for Connections {
                     self.state.toggle_selected();
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.activate {
-                    let selected = self.state.selected().to_vec();
-                    self.activate(selected)
+                    let selection = self.state.selected().to_vec();
+                    self.activate(&selection)
                 } else if key == self.config.key_config.list_item {
-                    let selected = self.state.selected().to_vec();
-                    if selected.len() == 2 {
-                        // listing a cloud provider
-                        self.list_cloud_provider(selected, Focus::Connections)
-                    } else if selected.len() == 3 {
-                        // listing a config
-                        self.list_configuration(selected.clone())
-                    } else {
-                        Ok(Action::Nothing)
-                    }
+                    let selection = self.state.selected().to_vec();
+                    self.connection_ls(&selection)
+                    // let selected = self.state.selected().to_vec();
+                    // if selected.len() == 2 {
+                    //     // listing a cloud provider
+                    //     self.list_cloud_provider(selected, Focus::Connections)
+                    // } else if selected.len() == 3 {
+                    //     // listing a config
+                    //     self.list_connection(selected.clone())
+                    // } else {
+                    //     Ok(Action::Nothing)
+                    // }
                 } else if key == self.config.key_config.filter {
                     // activate filter
                     self.filter.switch_active_status();

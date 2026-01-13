@@ -1,11 +1,13 @@
 use std::process::Command;
 
 use ego_tree::{iter::Nodes, NodeRef};
+use tracing::info;
 use tui_tree_widget::TreeItem;
 
 use crate::{action::Action, app::Focus, components::results_pager::ResultsPager};
 
 pub fn cli_command(program: &str, args: &Vec<&str>) -> Result<Vec<u8>, Action> {
+    info!("CLI Command {program} {args:?}");
     match Command::new(program).args(args).output() {
         Ok(output) => Ok(output.stdout),
         Err(_) => {
