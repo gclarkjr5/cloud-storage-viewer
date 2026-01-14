@@ -9,6 +9,7 @@ pub mod cloud_provider_connection;
 use tracing::{error, info};
 
 use crate::action::Action;
+use crate::app::Focus;
 use crate::components::connections::ConnectionComponentSelection;
 // use crate::components::connections::ListingRequest;
 use cloud_provider_connection::{AzureConfig, CloudConnection, GcsConfig, S3Config};
@@ -133,7 +134,7 @@ impl CloudProviderConfig {
 
                                         }
                                     };
-                                    let conf = GcsConfig { name: name.to_string(), is_active };
+                                    let conf = GcsConfig { name: name.to_string(), is_active, data: None };
                                     if conf.is_active {
                                         self.active_cloud_connection = Some(CloudConnection::Gcs(conf.clone()));
                                     }
@@ -245,7 +246,7 @@ impl CloudProviderConfig {
     //     }
     // }
 
-    pub fn ls(&mut self, selection: Vec<String>) -> Result<Action, Action> {
+    pub fn ls(&mut self, selection: Vec<String>) -> Result<Focus, Action> {
         if selection.len() < 2 {
             return Err(Action::Error("Cannot List Connections".to_string()))
         }
@@ -256,10 +257,35 @@ impl CloudProviderConfig {
                 // No account means we just re-list the Cloud Provider
                 self.list_connections(&connection_selection.cloud_provider_kind)?;
                 self.activate(selection)?;
-                Ok(Action::Nothing)
+                Ok(Focus::Connections)
             }
             Some(conn) => {
-                Ok(Action::Nothing)
+                self.activate(selection)?;
+                match &self.active_cloud_connection {
+                    None => Ok(Focus::Connections),
+                    Some(cloud_connection) => {
+                        match cloud_connection {
+                            CloudConnection::S3(_conf) => Err(Action::Error("Not implemented yet".to_string())),
+                            CloudConnection::Azure(_conf) =>{
+                                // conf.ls();
+                                Err(Action::Error("No Azure yet".to_string()))
+                            }
+                            CloudConnection::Gcs(conf) => {
+                                let output = conf.ls();
+                                self.active_cloud_connection = match output {
+                                    Err(_e) => None,
+                                    Ok(out) => Some(CloudConnection::Gcs(
+                                        GcsConfig { name: conf.name.clone(), is_active: true, data: Some(out) }
+                                    ))
+                                };
+                                Ok(Focus::Viewer)
+                                // Ok(Action::Nothing)
+                        
+                            }
+                        }
+                    }
+                }
+                // Ok(Action::Nothing)
             }
         }
         // this scenario is only for listing connections of a cloud provider
@@ -272,28 +298,5 @@ impl CloudProviderConfig {
         // self.activate(&listing_request.provider_kind, listing_request.connection.clone())?;
 
         // do the listing
-        // match &self.active_cloud_connection {
-        //     None => Ok(Action::Nothing),
-        //     Some(cloud_connection) => {
-        //         match cloud_connection {
-        //             CloudConnection::S3(_conf) => Err(Action::Error("Not implemented yet".to_string())),
-        //             CloudConnection::Azure(_conf) =>{
-        //                 // conf.ls();
-        //                 Ok(Action::Nothing)
-        //             }
-        //             CloudConnection::Gcs(conf) => {
-        //                 let output = conf.ls();
-        //                 Ok(
-        //                     Action::ConnectionList(
-        //                         // self.active_cloud_connection.clone(),
-        //                         // output?
-        //                     )
-        //                 )
-        //                 // Ok(Action::Nothing)
-                        
-        //             }
-        //         }
-        //     }
-        // }
     }
 }

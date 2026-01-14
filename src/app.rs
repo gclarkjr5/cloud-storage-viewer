@@ -70,9 +70,6 @@ impl App {
             info!("Initialized and registerd default config for component {component_name:?}");
         }
 
-        // self.error_component.register_config(&self.config, self.focus)?;
-        // self.error_component.init(&self.config)?;
-
         // time to work
         loop {
             // draw terminal
@@ -98,7 +95,8 @@ impl App {
                                     component.report_error(&e)?;
                                 }
                             }
-                            Ok(_) => {
+                            Ok(focus) => {
+                                self.change_focus(focus);
                                 for component in self.components.iter_mut() {
                                     component.register_config(&self.config, self.focus)?;
                                 }
@@ -271,7 +269,7 @@ impl App {
     pub fn connection_ls(
         &mut self,
         connection_selection: Vec<String>,
-    ) -> Result<Action, Action> {
+    ) -> Result<Focus, Action> {
 
         self.config.cloud_provider_config.ls(connection_selection)
         // match connection_selection.cloud_provider_connection {

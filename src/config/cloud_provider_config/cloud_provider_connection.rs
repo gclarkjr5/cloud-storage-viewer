@@ -19,14 +19,24 @@ pub struct AzureConfig {
 pub struct GcsConfig {
     pub name: String,
     pub is_active: bool,
+    pub data: Option<Vec<u8>>
 }
 
 impl GcsConfig {
     pub fn ls(&self) -> Result<Vec<u8>, Action> {
-        let output = util::cli_command("gsutil", &vec!["ls"])?;
+        let output = util::cli_command("gsutil", &vec!["ls"])?; 
+        //     Err(_e) => Err(Action::Error("cli ls issue".to_string())),
+        //     Ok(output) => {
+        //         self.data = Some(output.clone());
         info!("Results: {output:?}");
-
         Ok(output)
+        //     }
+        // }
+
+        // self.data = Some(output);
+
+        // Ok(())
+        // Ok(output)
 
         // Ok(Action::ListConnection(
         //     self.config.cloud_provider_config.,

@@ -445,6 +445,9 @@ impl Component for Connections {
 
     fn register_config(&mut self, config: &Config, focus: Focus) -> Result<(), String> {
         // self.config = config.clone();
+        if !matches!(focus, Focus::Connections) {
+            return Ok(())
+        }
         if !config.app_selection.is_empty() {
             let cloud_provider_kind: CloudProviderKind = config.app_selection[1].clone().into();
             let found_node = self.find_node_to_append(&config.app_selection).expect("Error finding node");
