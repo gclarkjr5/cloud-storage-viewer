@@ -7,12 +7,14 @@ use crate::{action::Action, config::cloud_provider_config::cloud_provider_kind::
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct S3Config {
     pub name: String,
+    pub data: Option<Vec<u8>>
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AzureConfig {
     pub name: String,
     pub is_active: bool,
+    pub data: Option<Vec<u8>>
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -28,7 +30,6 @@ impl GcsConfig {
         //     Err(_e) => Err(Action::Error("cli ls issue".to_string())),
         //     Ok(output) => {
         //         self.data = Some(output.clone());
-        info!("Results: {output:?}");
         Ok(output)
         //     }
         // }
@@ -83,5 +84,19 @@ impl CloudConnection {
             CloudConnection::Azure(conf) => conf.name.clone(),
             CloudConnection::Gcs(conf) => conf.name.clone(),
         }
+    }
+    pub fn set_data(&self, data: Vec<u8>) -> Option<CloudConnection> {
+        match self {
+            CloudConnection::S3(conf) => {
+                Some(CloudConnection::S3(S3Config { name: conf.name.clone(), data: Some(data) }))
+            },
+            CloudConnection::Azure(conf) => {
+                Some(CloudConnection::Azure(AzureConfig { name: conf.name.clone(), is_active: conf.is_active, data: Some(data) }))
+            },
+            CloudConnection::Gcs(conf) => {
+                Some(CloudConnection::Gcs(GcsConfig { name: conf.name.clone(), is_active: conf.is_active, data: Some(data) }))
+            },
+        }
+        
     }
 }

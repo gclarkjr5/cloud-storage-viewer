@@ -5,6 +5,7 @@ use crate::{action::Action, app::Focus, config::Config};
 use crossterm::event::{KeyEvent, MouseEvent};
 use ego_tree::{NodeId, Tree};
 use ratatui::{layout::Rect, Frame};
+use tracing::info;
 
 // pub mod connection_filter;
 // pub mod connection_filter_results;

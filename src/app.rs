@@ -1,21 +1,16 @@
-use std::fmt;
 use std::result::Result;
 use std::time::Duration;
 
 use crossterm::event::{Event, KeyEvent, MouseEvent};
-use ego_tree::NodeId;
 use tracing::info;
 
 use super::components::connections::Connections;
 use super::components::viewer::Viewer;
 use crate::action::Action;
-use crate::components::connections::ConnectionComponentSelection;
 use crate::components::error::ErrorComponent;
 use crate::components::footer::Footer;
 use crate::components::{Component as Comp, TreeComponent};
 use crate::config::Config;
-use crate::config::cloud_provider_config::cloud_provider_connection::CloudConnection;
-use crate::config::cloud_provider_config::cloud_provider_kind::CloudProviderKind;
 use crate::tui::Tui;
 
 #[derive(Debug, Clone, Copy)]
@@ -86,9 +81,27 @@ impl App {
                     //         component.register_config(self.config.clone(), self.focus)?;
                     //     }
                     // }
+                    Action::ViewerList(viewer_selection) => {
+                        self.config.app_selection = viewer_selection.clone();
+                        info!("Viewer selection: {:?}", self.config.app_selection);
+                        match self.ls(viewer_selection, self.focus) {
+                            Err(e) => if let Action::Error(e) = e {
+                                self.change_focus(Focus::Error);
+                                for component in self.components.iter_mut() {
+                                    component.report_error(&e)?;
+                                }
+                            }
+                            Ok(focus) => {
+                                self.change_focus(focus);
+                                for component in self.components.iter_mut() {
+                                    component.register_config(&self.config, self.focus)?;
+                                }
+                            }
+                        }
+                    }
                     Action::ConnectionList(connection_selection) => {
                         self.config.app_selection = connection_selection.clone();
-                        match self.connection_ls(connection_selection) {
+                        match self.ls(connection_selection, self.focus) {
                             Err(e) => if let Action::Error(e) = e {
                                 self.change_focus(Focus::Error);
                                 for component in self.components.iter_mut() {
@@ -266,12 +279,20 @@ impl App {
         }
     }
 
-    pub fn connection_ls(
+    pub fn ls(
         &mut self,
-        connection_selection: Vec<String>,
+        selection: Vec<String>,
+        focus: Focus,
     ) -> Result<Focus, Action> {
+        self.config.cloud_provider_config.ls(selection, focus)
+    }
 
-        self.config.cloud_provider_config.ls(connection_selection)
+    // pub fn connection_ls(
+    //     &mut self,
+    //     selection: Vec<String>,
+    // ) -> Result<Focus, Action> {
+
+    //     self.config.cloud_provider_config.ls(selection)
         // match connection_selection.cloud_provider_connection {
         //     None => {
         //         // if request_path.is_empty() {
@@ -347,7 +368,7 @@ impl App {
         //         // Ok(Action::Nothing)
         //     }
         // }
-    }
+    // }
 
     // pub fn activate(&mut self, connection_selection: ConnectionComponentSelection) -> Result<(), Action> {
     pub fn activate(&mut self, selection: Vec<String>) -> Result<(), Action> {

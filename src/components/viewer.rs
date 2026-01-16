@@ -18,6 +18,7 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 use crate::action::Action;
 use crate::app::Focus;
 use crate::config::Config;
+use crate::config::cloud_provider_config::cloud_provider_connection::CloudConnection;
 use crate::key::Key;
 use crate::util;
 
@@ -51,6 +52,50 @@ impl Default for Viewer {
 }
 
 impl Viewer {
+    fn create_nodes(&mut self, config: &Config, node_id: NodeId) -> Result<(), Action> {
+            let ac = config.cloud_provider_config.active_cloud_connection.clone().expect("error viewer");
+            if let CloudConnection::Gcs(c) = ac {
+                 c.data.expect("error getting data").lines().for_each(|result| {
+                     let res = result.expect("error getting result");
+
+                     match self.tree.get_mut(node_id) {
+                         None => (),
+                         Some(mut tree) => {tree.append(res);}
+                     }
+                });
+                Ok(())
+                
+            } else {
+                Ok(())
+            }
+            // match cloud_provider {
+            //     CloudProviderKind::Azure => {
+            //         config.cloud_provider_config.azure.iter().for_each(|config| {
+            //             let res = config.name.to_string();
+
+            //             match self.tree.get_mut(node_id) {
+            //                 None => (),
+            //                 Some(mut tree) => {tree.append(res);}
+            //             }
+            //         });
+            //         Ok(())
+                
+            //     },
+            //     CloudProviderKind::Gcs => {
+            //         config.cloud_provider_config.gcs.iter().for_each(|config| {
+            //             let res = config.name.to_string();
+
+            //             match self.tree.get_mut(node_id) {
+            //                 None => (),
+            //                 Some(mut tree) => {tree.append(res);}
+            //             }
+            //         });
+            //         Ok(())
+            //     }
+            //     CloudProviderKind::S3 => Err(Action::Error("S3 not implemented".to_string())),
+            // }
+        
+    }
     pub fn increase_results_page(&mut self) -> Option<()> {
         // only increase page idx if we are on a page less than the number of pages
         if self.results_pager.page_idx + 1 < self.results_pager.num_pages {
@@ -85,31 +130,140 @@ impl Component for Viewer {
     }
 
     fn register_config(&mut self, config: &Config, focus: Focus) -> Result<(), String> {
-        let active_config = match &config.cloud_provider_config.active_cloud_connection {
-            None => "No Active Cloud Connection".to_string(),
-            Some(s) => s.to_string()
-        };
+        if config.app_selection.is_empty() {
+            return Ok(())
+        }
 
-        let tree = ETree::new(active_config);
-        let mut items = vec![];
-        let results_pager = ResultsPager::default();
+        let initial_app_selection = &config.app_selection[0];
 
-        let nodes = tree.nodes();
-        nodes
-            .filter(|node| node.parent().is_none())
-            .for_each(|node| {
-                let val = node.value().to_string();
-                let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
-                    .expect("error creating nodes under parent");
+        match (focus, initial_app_selection.as_str()) {
+            (Focus::Connections, _) => {
+                Ok(())
+            }
+            (Focus::Viewer, "Cloud Providers") => {
+                // This is a request to list a connection from the Connections Component
+                let results_pager = ResultsPager::default();
 
-                util::add_children(node, &mut ti, &mut results_pager.clone(), focus);
-                items.push(ti);
-            });
+                let active_config = match &config.cloud_provider_config.active_cloud_connection {
+                    None => "No Active Cloud Connection".to_string(),
+                    Some(s) => s.to_string()
+                };
 
-        self.tree = tree;
-        self.items = items;
-        self.results_pager = results_pager;
-        self.filter.register_config(config, focus)
+                self.tree = ETree::new(active_config);
+
+                let mut items = vec![];
+                    // let nodes = tree.nodes();
+
+                let cloud = &config.app_selection[1];
+                let conn = &config.app_selection[2];
+
+                let node_str = format!("{}({})", conn, cloud);
+
+                let found_node = self.find_node_to_append(&[node_str]).expect("Error finding node");
+
+                match found_node {
+                    None => {
+                        info!("No Tree Node Identified");
+                    },
+                    Some(nid) => {
+                        info!("Tree Node Identified. Creating Stateful Tree for {:?}", &config.app_selection);
+                        self.create_nodes(config, nid).expect("Error Creating Nodes");
+
+                        self.items =
+                            util::make_tree_items(self.tree.nodes(), &mut self.results_pager, Focus::Connections);
+
+                        self.state.open(config.app_selection.to_vec());
+                
+                    }
+                }
+                self.tree.nodes()
+                    .filter(|node| node.parent().is_none())
+                    .for_each(|node| {
+                        let val = node.value().to_string();
+                        let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
+                            .expect("error creating nodes under parent");
+
+                        util::add_children(node, &mut ti, &mut results_pager.clone(), focus);
+                        items.push(ti);
+                    });
+            
+                // self.tree = tree;
+                self.items = items;
+                self.results_pager = results_pager;
+                self.filter.register_config(config, focus)?;
+                Ok(())
+            }
+            (Focus::Viewer, _) => {
+                let mut items = vec![];
+                let results_pager = ResultsPager::default();
+                let found_node = self.find_node_to_append(&config.app_selection).expect("Error finding node");
+                match found_node {
+                    None => {
+                        info!("No Tree Node Identified");
+                    },
+                    Some(nid) => {
+                        info!("Tree Node Identified. Adding to tree {:?}", &config.app_selection);
+                        self.create_nodes(config, nid).expect("Error Creating Nodes");
+
+
+                        self.items =
+                            util::make_tree_items(self.tree.nodes(), &mut self.results_pager, Focus::Connections);
+
+                        self.state.open(config.app_selection.to_vec());
+                
+                    }
+                }
+                self.tree.nodes()
+                    .filter(|node| node.parent().is_none())
+                    .for_each(|node| {
+                        let val = node.value().to_string();
+                        let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
+                            .expect("error creating nodes under parent");
+
+                        util::add_children(node, &mut ti, &mut results_pager.clone(), focus);
+                        items.push(ti);
+                    });
+                self.items = items;
+                self.results_pager = results_pager;
+                self.filter.register_config(config, focus)?;
+                Ok(())
+            }
+            (_, _) => {
+                Ok(())
+            }
+        }
+
+        // } else {
+            // The request was made from the Viewer
+            // let found_node = self.find_node_to_append(&config.app_selection).expect("Error finding node");
+            // info!("Found this node from the viewer: {:?}", found_node);
+            // match found_node {
+            //     None => {
+            //         info!("No Tree Node Identified");
+            //     },
+            //     Some(nid) => {
+            //         info!("Tree Node Identified. Creating Stateful Tree for {:?}", &config.app_selection);
+            //         self.create_nodes(config, nid).expect("Error Creating Nodes");
+
+            //         self.items =
+            //             util::make_tree_items(self.tree.nodes(), &mut self.results_pager, Focus::Connections);
+
+            //         self.state.open(config.app_selection.to_vec());
+                
+            //     }
+            // }
+            // self.tree.nodes()
+            //     .filter(|node| node.parent().is_none())
+            //     .for_each(|node| {
+            //         let val = node.value().to_string();
+            //         let mut ti = TreeItem::new(val.clone(), val.clone(), vec![])
+            //             .expect("error creating nodes under parent");
+
+            //         util::add_children(node, &mut ti, &mut results_pager.clone(), focus);
+            //         items.push(ti);
+            //     });
+        // }
+
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent, focus: Focus) -> Result<Action, Action> {
@@ -170,11 +324,12 @@ impl Component for Viewer {
                     Ok(Action::Nothing)
                 } else if key == self.config.key_config.list_item {
                     let selected = self.state.selected().to_vec();
-                    let actual_request_path = selected.last().unwrap();
-                    let data = util::cli_command("gsutil", &vec!["ls", actual_request_path])?;
-                    self.list_item(data, selected, focus)
-                        .expect("error calling list items");
-                    Ok(Action::Nothing)
+                    Ok(Action::ViewerList(selected))
+                    // let actual_request_path = selected.last().unwrap();
+                    // let data = util::cli_command("gsutil", &vec!["ls", actual_request_path])?;
+                    // self.list_item(data, selected, focus)
+                    //     .expect("error calling list items");
+                    // Ok(Action::Nothing)
                 } else if key == self.config.key_config.next_page {
                     self.increase_results_page();
                     self.items =

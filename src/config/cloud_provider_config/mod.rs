@@ -85,7 +85,7 @@ impl CloudProviderConfig {
                                     match ln.split_whitespace().last() {
                                         None => (),
                                         Some(l) => {
-                                            let conf = AzureConfig { name: l.to_string(), is_active: l == active_conn };
+                                            let conf = AzureConfig { name: l.to_string(), is_active: l == active_conn, data: None };
                                             if conf.is_active {
                                                 self.active_cloud_connection = Some(CloudConnection::Azure(conf.clone()));
                                             }
@@ -246,46 +246,71 @@ impl CloudProviderConfig {
     //     }
     // }
 
-    pub fn ls(&mut self, selection: Vec<String>) -> Result<Focus, Action> {
-        if selection.len() < 2 {
-            return Err(Action::Error("Cannot List Connections".to_string()))
-        }
+    pub fn ls(&mut self, selection: Vec<String>, focus: Focus) -> Result<Focus, Action> {
+        match focus {
+            Focus::Connections => {
+                if selection.len() < 2 {
+                    return Err(Action::Error("Cannot List Connections".to_string()))
+                }
 
-        let connection_selection: ConnectionComponentSelection = selection.clone().into();
-        match connection_selection.cloud_provider_connection {
-            None => {
-                // No account means we just re-list the Cloud Provider
-                self.list_connections(&connection_selection.cloud_provider_kind)?;
-                self.activate(selection)?;
-                Ok(Focus::Connections)
-            }
-            Some(conn) => {
-                self.activate(selection)?;
-                match &self.active_cloud_connection {
-                    None => Ok(Focus::Connections),
-                    Some(cloud_connection) => {
-                        match cloud_connection {
-                            CloudConnection::S3(_conf) => Err(Action::Error("Not implemented yet".to_string())),
-                            CloudConnection::Azure(_conf) =>{
-                                // conf.ls();
-                                Err(Action::Error("No Azure yet".to_string()))
-                            }
-                            CloudConnection::Gcs(conf) => {
-                                let output = conf.ls();
-                                self.active_cloud_connection = match output {
-                                    Err(_e) => None,
-                                    Ok(out) => Some(CloudConnection::Gcs(
-                                        GcsConfig { name: conf.name.clone(), is_active: true, data: Some(out) }
-                                    ))
-                                };
-                                Ok(Focus::Viewer)
-                                // Ok(Action::Nothing)
+                let connection_selection: ConnectionComponentSelection = selection.clone().into();
+                match connection_selection.cloud_provider_connection {
+                    None => {
+                        // No account means we just re-list the Cloud Provider
+                        self.list_connections(&connection_selection.cloud_provider_kind)?;
+                        self.activate(selection)?;
+                        Ok(Focus::Connections)
+                    }
+                    Some(_conn) => {
+                        self.activate(selection)?;
+                        match &self.active_cloud_connection {
+                            None => Ok(Focus::Connections),
+                            Some(cloud_connection) => {
+                                match cloud_connection {
+                                    CloudConnection::S3(_conf) => Err(Action::Error("Not implemented yet".to_string())),
+                                    CloudConnection::Azure(_conf) =>{
+                                        // conf.ls();
+                                        Err(Action::Error("No Azure yet".to_string()))
+                                    }
+                                    CloudConnection::Gcs(conf) => {
+                                        let output = conf.ls();
+                                        self.active_cloud_connection = match output {
+                                            Err(_e) => None,
+                                            Ok(out) => Some(CloudConnection::Gcs(
+                                                GcsConfig { name: conf.name.clone(), is_active: true, data: Some(out) }
+                                            ))
+                                        };
+                                        Ok(Focus::Viewer)
                         
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                // Ok(Action::Nothing)
+                
+            }
+            Focus::Viewer => {
+
+                let actual_request_path = selection.last().unwrap();
+                let data = util::cli_command("gsutil", &vec!["ls", actual_request_path])?;
+
+                match &self.active_cloud_connection {
+                    None => {
+                        Ok(focus)
+                        
+                    }
+                    Some(conn) => {
+                        self.active_cloud_connection = conn.set_data(data);
+                        Ok(focus)
+                        
+                    }
+                }
+                // self.li
+
+            }
+            _ => {
+                Ok(focus)
             }
         }
         // this scenario is only for listing connections of a cloud provider
